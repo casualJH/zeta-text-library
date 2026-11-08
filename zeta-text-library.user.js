@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.5
+// @version      0.1.6
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.5';
+  const VERSION = '0.1.6';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -195,7 +195,7 @@
   const scopeKey=()=>category==='all'?'all':category==='uncategorized'?'uncategorized':sub==='all'?'folder:'+category:'folder:'+sub;
   const canChooseSort=()=>category==='all'||(category!=='uncategorized'&&sub==='all');
   const isValidSort=x=>['folderAsc','folderDesc','createdAsc','createdDesc','user'].includes(x);
-  function sortModeFor(scope){return isValidSort(ui.sortModes?.[scope])?ui.sortModes[scope]:'user';}
+  function sortModeFor(scope){return isValidSort(ui.sortModes?.[scope])?ui.sortModes[scope]:(scope==='all'||(scope.startsWith('folder:')&&folderById(scope.slice(7))?.parentId===null)?'folderAsc':'user');}
   const sortLabels={folderAsc:'폴더순',folderDesc:'폴더순(역순)',createdAsc:'등록순 ↑',createdDesc:'등록순 ↓',user:'사용자 정렬'};
   function sortedScope(scope,items){
     const ids=data.orders?.[scope]||[];
