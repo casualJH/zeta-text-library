@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.1
+// @version      0.1.2
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.1.2';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -196,7 +196,7 @@
   const canChooseSort=()=>category==='all'||(category!=='uncategorized'&&sub==='all');
   const isValidSort=x=>['folderAsc','folderDesc','createdAsc','createdDesc','user'].includes(x);
   function sortModeFor(scope){return isValidSort(ui.sortModes?.[scope])?ui.sortModes[scope]:'user';}
-  const sortLabels={folderAsc:'폴더순 ↑',folderDesc:'폴더순 ↓',createdAsc:'등록순 ↑',createdDesc:'등록순 ↓',user:'사용자 정렬'};
+  const sortLabels={folderAsc:'폴더순',folderDesc:'폴더순(역순)',createdAsc:'등록순 ↑',createdDesc:'등록순 ↓',user:'사용자 정렬'};
   function sortedScope(scope,items){
     const ids=data.orders?.[scope]||[];
     const position=new Map(ids.map((id,i)=>[id,i]));
@@ -289,7 +289,7 @@
       return heading+card(e,mode!=='user');
     }).join('');
     const available=canChooseSort();
-    const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순 ↑</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순 ↓</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순 ↑ (오래된 순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순 ↓ (최신 순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select><button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button></div>`:'';
+    const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순(최신순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select><button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button></div>`:'';
     content.innerHTML=`${renderTabs()}${renderSub()}${sortMenu}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
@@ -297,7 +297,7 @@
     const scope=sortSettingsScope||scopeKey();
     const basis=['folderAsc','folderDesc','createdAsc','createdDesc'].includes(ui.sortBases?.[scope])?ui.sortBases[scope]:'createdAsc';
     const name=scope==='all'?'전체':scope.startsWith('folder:')?(folderById(scope.slice(7))?.name||'폴더')+' → 전체':'미분류';
-    content.innerHTML=`<h3>사용자 정렬 설정</h3><div class="muted">적용 위치: ${esc(name)}</div><div class="box settingshint"><strong>기본 순서 (사용자 정렬 초기화 기준)</strong><div class="muted">사용자 정렬을 처음 만들거나 초기화할 때 사용할 순서를 선택하세요.</div><label class="field" for="sort-base">기준 선택</label><select id="sort-base"><option value="folderAsc" ${basis==='folderAsc'?'selected':''}>폴더순 ↑</option><option value="folderDesc" ${basis==='folderDesc'?'selected':''}>폴더순 ↓</option><option value="createdAsc" ${basis==='createdAsc'?'selected':''}>등록순 ↑ (오래된 순)</option><option value="createdDesc" ${basis==='createdDesc'?'selected':''}>등록순 ↓ (최신 순)</option></select></div><div class="box settingshint"><strong>사용자 정렬 초기화</strong><div class="muted">선택한 기준으로 이 위치의 사용자 정렬을 다시 만듭니다. 이미 드래그한 순서는 확인 후 덮어쓰며, 다른 폴더 순서와 텍스트는 변경하지 않습니다.</div><button class="btn primary" data-act="resetsort">기준 순서로 초기화</button></div>`;
+    content.innerHTML=`<h3>사용자 정렬 설정</h3><div class="muted">적용 위치: ${esc(name)}</div><div class="box settingshint"><strong>기본 순서 (사용자 정렬 초기화 기준)</strong><div class="muted">사용자 정렬을 처음 만들거나 초기화할 때 사용할 순서를 선택하세요.</div><label class="field" for="sort-base">기준 선택</label><select id="sort-base"><option value="folderAsc" ${basis==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${basis==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${basis==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${basis==='createdDesc'?'selected':''}>등록순(최신순)</option></select></div><div class="box settingshint"><strong>사용자 정렬 초기화</strong><div class="muted">선택한 기준으로 이 위치의 사용자 정렬을 다시 만듭니다. 이미 드래그한 순서는 확인 후 덮어쓰며, 다른 폴더 순서와 텍스트는 변경하지 않습니다.</div><button class="btn primary" data-act="resetsort">기준 순서로 초기화</button></div>`;
     footer.innerHTML=`<button class="btn" data-act="main">← 목록으로</button>`;
   }
   function optionsHtml(selectedId){
