@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.3
+// @version      0.1.4
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.3';
+  const VERSION = '0.1.4';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -291,7 +291,7 @@
     const available=canChooseSort();
     const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순(최신순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select>${mode==='user'?`<button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button>`:''}</div>`:'';
     content.innerHTML=`${renderTabs()}${renderSub()}${sortMenu}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
-    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
+    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="moveselected" ${selected.size?'':'disabled'}>폴더 이동</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
   function renderSortSettings(){
     const scope=sortSettingsScope||scopeKey();
@@ -302,6 +302,12 @@
   }
   function optionsHtml(selectedId){
     return `<option value="" ${!selectedId?'selected':''}>미분류</option>`+folders(null).map(f=>`<option value="${esc(f.id)}" ${selectedId===f.id?'selected':''}>${esc(f.name)}</option>`+folders(f.id).map(c=>`<option value="${esc(c.id)}" ${selectedId===c.id?'selected':''}>　↳ ${esc(c.name)}</option>`).join('')).join('');
+  }
+  function renderMoveSelected(){
+    const count=data.entries.filter(e=>selected.has(e.id)).length;
+    if(!count){selectionMode=false;go('main');return;}
+    content.innerHTML=`<h3>선택 텍스트 폴더 이동</h3><div class="muted">${count}개 텍스트를 이동할 폴더를 선택하세요.</div><label class="field" for="move-selected-folder">이동할 폴더</label><select id="move-selected-folder">${optionsHtml(null)}</select><div class="box settingshint">텍스트 내용과 등록일은 유지됩니다. 이동한 항목은 새 폴더의 정렬 목록에 표시됩니다.</div>`;
+    footer.innerHTML=`<button class="btn primary" data-act="confirmmoveselected">이동 (${count})</button><button class="btn" data-act="main">취소</button>`;
   }
   function resizeEditorBody(){
     const field=$('#entry-body');
@@ -335,7 +341,7 @@
     content.innerHTML=`<h3>백업 및 복원</h3><div class="box settingshint">폴더, 텍스트 및 창·버튼 설정을 하나의 JSON 파일로 백업합니다. 파일은 직접 보관해야 합니다.</div><button class="btn primary" data-act="export">JSON 전체 백업 다운로드</button><hr style="border:0;border-top:1px solid #e5e5ed;margin:16px 0"><h3>JSON 가져오기</h3><label class="field">백업 파일 선택</label><input id="import-file" type="file" accept=".json,application/json"><label class="field">복원 방식</label><label class="row" style="margin:10px 0"><input type="radio" name="import-mode" value="merge" checked> 기존 데이터에 합치기</label><label class="row" style="margin:10px 0"><input type="radio" name="import-mode" value="replace"> 기존 데이터를 모두 바꾸기</label><div class="muted">합치기는 동일한 ID의 항목을 중복 추가하지 않습니다. 바꾸기는 기존 보관 내용을 교체하므로 주의하세요.</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="import">가져오기</button><button class="btn" data-act="main">돌아가기</button>`;
   }
-  function render(){ if(!showPanel)return; switch(currentPage){case 'editor':renderEditor();break;case 'folders':renderFolders();break;case 'folderedit':renderFolderEdit();break;case 'settings':renderSettings();break;case 'backup':renderBackup();break;case 'sortsettings':renderSortSettings();break;default:renderMain();} }
+  function render(){ if(!showPanel)return; switch(currentPage){case 'editor':renderEditor();break;case 'folders':renderFolders();break;case 'folderedit':renderFolderEdit();break;case 'settings':renderSettings();break;case 'backup':renderBackup();break;case 'sortsettings':renderSortSettings();break;case 'moveselected':renderMoveSelected();break;default:renderMain();} }
   function go(page){currentPage=page;render();content.scrollTop=0;}
   function downloadJson(){
     const backup={format:'zeta-text-vault',version:VERSION,exportedAt:new Date().toISOString(),data,ui};
@@ -422,6 +428,16 @@
       case 'moveentry':moveEntry(id,+el.dataset.step);return;
       case 'selectionon':selectionMode=true;selected.clear();render();return;
       case 'selectionoff':selectionMode=false;selected.clear();render();return;
+      case 'moveselected':if(!selected.size)return;go('moveselected');return;
+      case 'confirmmoveselected':{
+        if(currentPage!=='moveselected'||!selected.size)return;
+        const folderId=$('#move-selected-folder')?.value||null;
+        if(folderId!==null&&!folderById(folderId)){notify('이동할 폴더를 다시 선택하세요.');return;}
+        const entries=data.entries.filter(e=>selected.has(e.id));
+        if(!entries.length)return;
+        entries.forEach(e=>{e.folderId=folderId;});
+        persist();selectionMode=false;selected.clear();go('main');notify(entries.length+'개 텍스트를 이동했습니다.');return;
+      }
       case 'newentry':editorId=null;go('editor');return;
       case 'edit':editorId=id;go('editor');return;
       case 'saveentry':{
@@ -472,7 +488,7 @@
       }
       return;
     }
-    if(t.matches('[data-pick]')){t.checked?selected.add(t.dataset.pick):selected.delete(t.dataset.pick);const button=footer.querySelector('[data-act="copyselected"]');if(button){button.disabled=!selected.size;button.textContent=`선택 복사 (${selected.size})`;}}
+    if(t.matches('[data-pick]')){t.checked?selected.add(t.dataset.pick):selected.delete(t.dataset.pick);const button=footer.querySelector('[data-act="copyselected"]');if(button){button.disabled=!selected.size;button.textContent=`선택 복사 (${selected.size})`;}const moveButton=footer.querySelector('[data-act="moveselected"]');if(moveButton)moveButton.disabled=!selected.size;}
   });
   root.addEventListener('input',event=>{
     const t=event.target;
