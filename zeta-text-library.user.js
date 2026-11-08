@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.5
+// @version      0.0.6
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -205,7 +205,7 @@
   function renderEditor(){
     const entry=editorId?data.entries.find(e=>e.id===editorId):null;
     const initialFolder=entry?.folderId || (category==='all'||category==='uncategorized'?null:(sub==='all'?category:sub));
-    content.innerHTML=`<h3>${entry?'텍스트 수정':'새 텍스트 저장'}</h3><label class="field" for="entry-title">제목</label><input id="entry-title" type="text" maxlength="200" value="${esc(entry?.title||'')}" placeholder="제목을 입력하세요"><label class="field" for="entry-folder">저장 폴더</label><select id="entry-folder">${optionsHtml(initialFolder)}</select><label class="field" for="entry-body">본문</label><textarea id="entry-body" maxlength="200000" placeholder="OOC, 프로필, 세계관 등 원하는 텍스트">${esc(entry?.body||'')}</textarea><div class="muted">저장된 내용은 모든 제타 채팅방에서 공통으로 사용할 수 있습니다.</div>`;
+    content.innerHTML=`<h3>${entry?'텍스트 수정':'새 텍스트 저장'}</h3><label class="field" for="entry-title">제목</label><input id="entry-title" type="text" maxlength="200" value="${esc(entry?.title||'')}" placeholder="제목을 입력하세요"><label class="field" for="entry-folder">저장 폴더</label><select id="entry-folder">${optionsHtml(initialFolder)}</select><label class="field" for="entry-body">본문</label><textarea id="entry-body" maxlength="200000" placeholder="원하는 텍스트">${esc(entry?.body||'')}</textarea><div class="muted">저장된 내용은 모든 제타 채팅방에서 공통으로 사용할 수 있습니다.</div>`;
     resizeEditorBody();
     footer.innerHTML=`<button class="btn primary" data-act="saveentry">저장</button><button class="btn" data-act="main">취소</button>${entry?`<button class="btn danger" data-act="delete" data-id="${esc(entry.id)}" style="margin-left:auto">삭제</button>`:''}`;
   }
