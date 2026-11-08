@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.7
+// @version      0.0.8
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.0.3';
+  const VERSION = '0.0.8';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -278,7 +278,7 @@
     switch(act){
       case 'close':showPanel=false;panel.hidden=true;return;
       case 'main':go('main');return;
-      case 'toggletheme':ui.theme=host.dataset.theme==='dark'?'light':'dark';persistUi();applyTheme();if(currentPage==='settings')renderSettings();return;
+      case 'toggletheme':ui.theme=ui.theme==='auto'?'light':ui.theme==='light'?'dark':'light';persistUi();applyTheme();if(currentPage==='settings')renderSettings();return;
       case 'settings':go('settings');return;
       case 'folders':go('folders');return;
       case 'backup':go('backup');return;
