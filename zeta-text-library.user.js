@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.6
+// @version      0.1.7
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.6';
+  const VERSION = '0.1.7';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -284,7 +284,14 @@
       if(isGrouped){
         const folder=e.folderId&&folderById(e.folderId);
         const key=folder?.id||'uncategorized';
-        if(key!==lastGroup){lastGroup=key;heading=`<div class="group-heading">${esc(folder?.name||'미분류')}</div>`;}
+        if(key!==lastGroup){
+          lastGroup=key;
+          const groupName=!folder?'미분류'
+            :category==='all'&&folder.parentId
+              ?(folderById(folder.parentId)?.name||'미분류')+' / '+folder.name
+              :folder.name;
+          heading=`<div class="group-heading">${esc(groupName)}</div>`;
+        }
       }
       return heading+card(e,mode!=='user');
     }).join('');
