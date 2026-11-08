@@ -257,7 +257,7 @@
   function hasCustomOrder(scope){return Array.isArray(data.orders?.[scope]) && data.orders[scope].length>0;}
   function seedUserOrder(scope,basis){
     const ids=baseOrdered(scope,scopeEntriesUnfiltered(),basis).map(e=>e.id);
-    data.orders[scope]=ids;data.orders[scope+'-basis']=undefined;
+    data.orders[scope]=ids;
     persist();
   }
   function renderTabs(){
@@ -494,7 +494,7 @@
     const pos=ordered.findIndex(e=>e.id===targetId);
     if(pos<0)return;
     ordered.splice(pos+(after?1:0),0,...visible.filter(e=>moving.has(e.id)));
-    const current=sortedScope(scope,data.entries);
+    const current=sortedScope(scope,scopeEntriesUnfiltered());
     const visibleIds=new Set(visible.map(e=>e.id));
     let index=0;
     data.orders[scope]=current.map(e=>visibleIds.has(e.id)?ordered[index++].id:e.id);
