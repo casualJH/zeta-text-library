@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.1
+// @version      0.0.2
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.0.1';
+  const VERSION = '0.0.2';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -28,9 +28,11 @@
   const defaultData = () => ({ schema: 1, folders: [
     {id:'ooc',parentId:null,name:'OOC'},
     {id:'profile',parentId:null,name:'유저 프로필'},
-    {id:'world',parentId:null,name:'세계관'}
+    {id:'other',parentId:null,name:'기타'},
+    {id:'ooc-summary',parentId:'ooc',name:'요약'},
+    {id:'ooc-style',parentId:'ooc',name:'문체'}
   ], entries: [] });
-  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540 });
+  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'light' });
   const safePos = p => p && Number.isFinite(p.x) && Number.isFinite(p.y) ? {x:p.x,y:p.y} : null;
   const asNumber = (n, fallback, min, max) => Number.isFinite(+n) ? Math.max(min, Math.min(max, +n)) : fallback;
   const sanitizeText = (v, max) => String(v ?? '').slice(0,max);
@@ -64,8 +66,27 @@
   }
   let data;
   try { data = normalizeData(read(DATA_KEY,defaultData())); } catch (_) { data=defaultData(); }
+  // Preserve existing content while adding the new default tabs for existing installations.
+  // Do not rename or delete user-created folders or their content.
+  if (!data.folders.some(f=>f.id==='other' || (f.parentId===null && f.name==='기타'))) {
+    const oldWorld=data.folders.find(f=>f.id==='world' && f.parentId===null && f.name==='세계관');
+    if (oldWorld && !data.entries.some(e=>e.folderId==='world') && !data.folders.some(f=>f.parentId==='world')) {
+      oldWorld.name='기타';
+    } else {
+      data.folders.push({id:'other',parentId:null,name:'기타'});
+    }
+  }
+  if (data.folders.some(f=>f.id==='ooc')) {
+    for (const [id,name] of [['ooc-summary','요약'],['ooc-style','문체']]) {
+      if (!data.folders.some(f=>f.parentId==='ooc' && f.name===name)) {
+        data.folders.push({id:data.folders.some(f=>f.id===id)?uid():id,parentId:'ooc',name});
+      }
+    }
+  }
+  write(DATA_KEY,data);
   const oldUi = read(UI_KEY, defaultUi());
   let ui = {...defaultUi(), ...(oldUi && typeof oldUi === 'object' ? oldUi : {})};
+  ui.theme = ['light','dark','auto'].includes(ui.theme) ? ui.theme : 'light';
   ui.buttonText = sanitizeText(ui.buttonText,32);
   ui.buttonSize = asNumber(ui.buttonSize,48,32,100);
   ui.panelW = asNumber(ui.panelW,380,260,1600);
@@ -93,6 +114,22 @@
     #grip{position:absolute;right:0;bottom:0;width:30px;height:30px;cursor:nwse-resize;touch-action:none;z-index:4;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px;color:#7c8194;font-size:19px;line-height:1;user-select:none} #toast{position:absolute;bottom:47px;left:12px;right:12px;text-align:center;background:#303449;color:white;border-radius:8px;padding:8px;font-size:12px;pointer-events:none;display:none;z-index:6}
     .check{width:17px;height:17px;accent-color:#383d55;flex:none} .tiny{font-size:11px} .spacer{flex:1} .inline{display:flex;align-items:center;gap:5px;flex-wrap:wrap} .settingshint{line-height:1.6} .no-select{user-select:none}
     @media(max-width:420px){#content{padding:10px}#header{padding:10px} #footer{padding:9px} .entry{padding:9px}}
+    :host([data-theme="dark"]) {color-scheme:dark}
+    :host([data-theme="dark"]) #panel {background:#1c1e27;color:#f0f1f7;border-color:#505365}
+    :host([data-theme="dark"]) #header {background:#252735;border-color:#434656}
+    :host([data-theme="dark"]) #footer {background:#1c1e27;border-color:#434656}
+    :host([data-theme="dark"]) .btn {background:#292c39;color:#eef0f8;border-color:#575b6d}
+    :host([data-theme="dark"]) .btn.active,:host([data-theme="dark"]) .btn.primary {background:#747da4;color:#fff;border-color:#747da4}
+    :host([data-theme="dark"]) .btn.danger {color:#ff9ba8}
+    :host([data-theme="dark"]) .entry {background:#242735;border-color:#4b5061}
+    :host([data-theme="dark"]) .preview {color:#d0d3df}
+    :host([data-theme="dark"]) .muted,:host([data-theme="dark"]) .empty {color:#aaafc3}
+    :host([data-theme="dark"]) .box {background:#282b39;border-color:#454a5b}
+    :host([data-theme="dark"]) .subline,:host([data-theme="dark"]) .folder-row {border-color:#454a5b}
+    :host([data-theme="dark"]) input[type=text],:host([data-theme="dark"]) input[type=search],:host([data-theme="dark"]) input[type=file],:host([data-theme="dark"]) textarea,:host([data-theme="dark"]) select {background:#252838;color:#f1f2f8;border-color:#5c6175}
+    :host([data-theme="dark"]) input::placeholder,:host([data-theme="dark"]) textarea::placeholder {color:#9da3b7}
+    :host([data-theme="dark"]) #grip {color:#adb4cf}
+    :host([data-theme="dark"]) .check {accent-color:#929ac3}
   </style>
   <button type="button" id="launcher" aria-label="제타 텍스트 보관함 열기"></button>
   <section id="panel" hidden aria-label="제타 텍스트 보관함">
@@ -101,6 +138,9 @@
   </section>`;
   const $ = s => root.querySelector(s);
   const launcher=$('#launcher'), panel=$('#panel'), content=$('#content'), footer=$('#footer');
+  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)');
+  function applyTheme(){ const dark=ui.theme==='dark' || (ui.theme==='auto' && !!prefersDark?.matches);host.dataset.theme=dark?'dark':'light'; }
+  prefersDark?.addEventListener?.('change',()=>{if(ui.theme==='auto')applyTheme();});
   const persist = () => write(DATA_KEY,data);
   const persistUi = () => write(UI_KEY,ui);
   const folders = parent => data.folders.filter(f=>f.parentId===parent);
@@ -117,6 +157,7 @@
     pos.x=x;pos.y=y;
   }
   function applyUi() {
+    applyTheme();
     launcher.textContent=ui.buttonText || '📚';
     launcher.style.fontSize=Math.round(ui.buttonSize*.38)+'px';
     launcher.style.minHeight=ui.buttonSize+'px';
@@ -145,7 +186,7 @@
   }
   function card(e){
     const path=e.folderId ? [folderById(rootOf(e.folderId))?.name,folderById(e.folderId)?.parentId?folderById(e.folderId)?.name:null].filter(Boolean).join(' / ') : '미분류';
-    return `<article class="entry"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><label class="row tiny" title="여러 항목 선택"><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="copy" data-id="${esc(e.id)}">복사</button><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button><button class="btn sm danger" data-act="delete" data-id="${esc(e.id)}">삭제</button></div></article>`;
+    return `<article class="entry"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><label class="row tiny" title="여러 항목 선택"><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="copy" data-id="${esc(e.id)}">복사</button><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button><button class="btn sm" data-act="moveentry" data-id="${esc(e.id)}" data-step="-1" title="항목 위로">↑</button><button class="btn sm" data-act="moveentry" data-id="${esc(e.id)}" data-step="1" title="항목 아래로">↓</button></div></article>`;
   }
   function renderMain(){
     const visible=data.entries.filter(entryVisible);
@@ -159,7 +200,7 @@
     const entry=editorId?data.entries.find(e=>e.id===editorId):null;
     const initialFolder=entry?.folderId || (category==='all'||category==='uncategorized'?null:(sub==='all'?category:sub));
     content.innerHTML=`<h3>${entry?'텍스트 수정':'새 텍스트 저장'}</h3><label class="field" for="entry-title">제목</label><input id="entry-title" type="text" maxlength="200" value="${esc(entry?.title||'')}" placeholder="제목을 입력하세요"><label class="field" for="entry-folder">저장 폴더</label><select id="entry-folder">${optionsHtml(initialFolder)}</select><label class="field" for="entry-body">본문</label><textarea id="entry-body" maxlength="200000" placeholder="OOC, 프로필, 세계관 등 원하는 텍스트">${esc(entry?.body||'')}</textarea><div class="muted">저장된 내용은 모든 제타 채팅방에서 공통으로 사용할 수 있습니다.</div>`;
-    footer.innerHTML=`<button class="btn primary" data-act="saveentry">저장</button><button class="btn" data-act="main">취소</button>`;
+    footer.innerHTML=`<button class="btn primary" data-act="saveentry">저장</button><button class="btn" data-act="main">취소</button>${entry?`<button class="btn danger" data-act="delete" data-id="${esc(entry.id)}" style="margin-left:auto">삭제</button>`:''}`;
   }
   function renderFolders(){
     content.innerHTML=`<h3>폴더 관리</h3><div class="muted settingshint">폴더 이름 변경·순서 이동·삭제가 가능합니다. 폴더 삭제 시 보관한 텍스트는 미분류로 이동합니다.</div>${data.folders.length?folders(null).map(f=>folderRow(f)+folders(f.id).map(child=>folderRow(child)).join('')).join(''):'<div class="empty">폴더가 없습니다.</div>'}<div class="box"><strong>폴더 추가</strong><label class="field">상위 폴더</label><select id="folder-parent"><option value="">대분류 (최상위)</option>${folders(null).map(f=>`<option value="${esc(f.id)}" ${category===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select><label class="field">새 폴더 이름</label><input id="folder-name" type="text" maxlength="100" placeholder="폴더 이름"><button class="btn primary" style="margin-top:8px" data-act="addfolder">추가</button></div>`;
@@ -173,7 +214,7 @@
     footer.innerHTML=`<button class="btn primary" data-act="saverename">저장</button><button class="btn" data-act="folders">취소</button>`;
   }
   function renderSettings(){
-    content.innerHTML=`<h3>창 및 실행 버튼 설정</h3><div class="box settingshint">창 상단을 끌어 위치를 이동하고, 오른쪽 아래 ◢ 모서리를 끌어 창 크기를 조절합니다. 실행 버튼 자체를 끌어서 위치를 옮길 수 있습니다.</div><label class="field">실행 버튼 글자 / 이모지 (직접 입력)</label><input id="button-text" maxlength="32" type="text" value="${esc(ui.buttonText)}" placeholder="📚 또는 OOC, 보관함"><label class="field" for="button-size">실행 버튼 크기: <span id="button-size-value">${ui.buttonSize}px</span></label><input id="button-size" type="range" min="32" max="100" step="2" value="${ui.buttonSize}"><div class="box"><div class="muted">현재 창 크기: <span id="panel-dimensions">${Math.round(ui.panelW)} × ${Math.round(ui.panelH)}px</span></div><div class="muted">창 내부의 내용이 길면 내부만 스크롤됩니다.</div></div><button class="btn" data-act="resetpositions">창·버튼 위치 및 크기 초기화</button>`;
+    content.innerHTML=`<h3>창 및 실행 버튼 설정</h3><label class="field" for="theme-select">화면 테마</label><select id="theme-select"><option value="light" ${ui.theme==='light'?'selected':''}>라이트 모드</option><option value="dark" ${ui.theme==='dark'?'selected':''}>다크 모드</option><option value="auto" ${ui.theme==='auto'?'selected':''}>기기 설정에 따르기</option></select><div class="box settingshint">창 상단을 끌어 위치를 이동하고, 오른쪽 아래 ◢ 모서리를 끌어 창 크기를 조절합니다. 실행 버튼 자체를 끌어서 위치를 옮길 수 있습니다.</div><label class="field">실행 버튼 글자 / 이모지 (직접 입력)</label><input id="button-text" maxlength="32" type="text" value="${esc(ui.buttonText)}" placeholder="📚 또는 OOC, 보관함"><label class="field" for="button-size">실행 버튼 크기: <span id="button-size-value">${ui.buttonSize}px</span></label><input id="button-size" type="range" min="32" max="100" step="2" value="${ui.buttonSize}"><div class="box"><div class="muted">현재 창 크기: <span id="panel-dimensions">${Math.round(ui.panelW)} × ${Math.round(ui.panelH)}px</span></div><div class="muted">창 내부의 내용이 길면 내부만 스크롤됩니다.</div></div><div class="box settingshint"><strong>초기화</strong><div class="muted">UI 초기화는 버튼 글자·크기, 창 크기·위치, 테마를 기본값으로 되돌리고 저장된 폴더와 텍스트는 유지합니다.</div><button class="btn" style="margin-top:8px" data-act="resetui">UI 설정 초기화</button></div><div class="box settingshint"><strong>보관함 전체 초기화</strong><div class="muted">저장한 모든 텍스트와 사용자 폴더를 삭제하고 기본 폴더( OOC / 유저 프로필 / 기타 및 OOC의 요약 / 문체 )로 복원합니다. 창·버튼 설정은 그대로 유지됩니다. 실행 전 JSON 백업을 권장합니다.</div><button class="btn danger" style="margin-top:8px" data-act="resetlibrary">보관함 전체 초기화</button></div>`;
     footer.innerHTML=`<button class="btn primary" data-act="savesettings">설정 저장</button><button class="btn" data-act="main">돌아가기</button>`;
   }
   function renderBackup(){
@@ -186,7 +227,7 @@
     const backup={format:'zeta-text-vault',version:VERSION,exportedAt:new Date().toISOString(),data,ui};
     const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'});
     const url=URL.createObjectURL(blob),link=document.createElement('a');
-    link.href=url;link.download='zeta-text-vault-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    link.href=url;link.download='zeta-text-library-backup-'+new Date().toISOString().slice(0,10)+'.json';
     document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);notify('백업 파일 다운로드를 요청했습니다.');
   }
   async function importJson(){
@@ -196,7 +237,7 @@
     let parsed,incoming;
     try {parsed=JSON.parse(await file.text());if(parsed?.format!=='zeta-text-vault')throw Error('제타 텍스트 보관함 백업이 아닙니다.');incoming=normalizeData(parsed.data);}catch(e){notify('가져오기 실패: '+(e.message||'형식 오류'));return;}
     if(!confirm(mode==='replace'?'기존 폴더와 텍스트를 모두 백업 내용으로 교체할까요?':'백업 항목을 기존 보관함에 합칠까요?'))return;
-    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);persistUi();}}
+    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'light';persistUi();}}
     else {
       const existingFolders=new Set(data.folders.map(f=>f.id));
       const remap=new Map();
@@ -216,6 +257,15 @@
     notify(ok?'클립보드에 복사했습니다.':'자동 복사 실패: Safari 클립보드 권한을 확인하세요.');
   }
   function removeFolder(id){const ids=descendants(id);if(!confirm('폴더를 삭제할까요? 내부 텍스트는 미분류로 이동합니다.'))return;data.entries.forEach(e=>{if(ids.has(e.folderId))e.folderId=null;});data.folders=data.folders.filter(f=>!ids.has(f.id));selected.clear();if(ids.has(category)){category='all';sub='all';}if(ids.has(sub))sub='all';persist();render();}
+  function moveEntry(id,step){
+    const e=data.entries.find(x=>x.id===id);if(!e)return;
+    const visible=data.entries.filter(entryVisible);
+    const index=visible.findIndex(x=>x.id===id),neighbor=visible[index+step];
+    if(!neighbor)return;
+    const a=data.entries.indexOf(e),b=data.entries.indexOf(neighbor);
+    [data.entries[a],data.entries[b]]=[data.entries[b],data.entries[a]];
+    persist();render();
+  }
   function moveFolder(id,step){const f=folderById(id);if(!f)return;const siblings=folders(f.parentId);const i=siblings.findIndex(x=>x.id===id),neighbor=siblings[i+step];if(!neighbor)return;const a=data.folders.indexOf(f),b=data.folders.indexOf(neighbor);[data.folders[a],data.folders[b]]=[data.folders[b],data.folders[a]];persist();render();}
   function handleAction(act,id,el){
     switch(act){
@@ -232,6 +282,7 @@
       case 'saverename':{const f=folderById(editingFolderId),name=$('#rename-name')?.value.trim();if(!f||!name){notify('폴더 이름을 입력하세요.');return;}if(data.folders.some(x=>x.id!==f.id&&x.parentId===f.parentId&&x.name===name)){notify('같은 이름의 폴더가 있습니다.');return;}f.name=name;persist();go('folders');return;}
       case 'deletefolder':removeFolder(id);return;
       case 'movefolder':moveFolder(id,+el.dataset.step);return;
+      case 'moveentry':moveEntry(id,+el.dataset.step);return;
       case 'newentry':editorId=null;go('editor');return;
       case 'edit':editorId=id;go('editor');return;
       case 'saveentry':{
@@ -243,13 +294,22 @@
         else data.entries.unshift({id:uid(),title,body,folderId,createdAt:now,updatedAt:now});
         persist();go('main');notify('저장했습니다.');return;
       }
-      case 'delete':{const e=data.entries.find(x=>x.id===id);if(!e||!confirm('"'+e.title+'" 항목을 삭제할까요?'))return;data.entries=data.entries.filter(x=>x.id!==id);selected.delete(id);persist();render();return;}
+      case 'delete':{if(currentPage!=='editor'||editorId!==id)return;const e=data.entries.find(x=>x.id===id);if(!e||!confirm('"'+e.title+'" 항목을 삭제할까요?'))return;data.entries=data.entries.filter(x=>x.id!==id);selected.delete(id);editorId=null;persist();go('main');return;}
       case 'copy':{const e=data.entries.find(x=>x.id===id);if(e)void copyText(e.body);return;}
       case 'copyselected':{const values=data.entries.filter(e=>selected.has(e.id)).map(e=>e.body);if(values.length)void copyText(values.join('\n\n'));return;}
       case 'export':downloadJson();return;
       case 'import':void importJson();return;
-      case 'savesettings':ui.buttonText=sanitizeText($('#button-text')?.value||'📚',32);ui.buttonSize=asNumber($('#button-size')?.value,48,32,100);persistUi();applyUi();go('main');notify('설정을 저장했습니다.');return;
-      case 'resetpositions':if(!confirm('창·버튼 위치와 크기를 기본값으로 바꿀까요?'))return;ui={...ui,...{buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540}};persistUi();applyUi();render();return;
+      case 'savesettings':ui.theme=['light','dark','auto'].includes($('#theme-select')?.value)?$('#theme-select').value:'light';ui.buttonText=sanitizeText($('#button-text')?.value||'📚',32);ui.buttonSize=asNumber($('#button-size')?.value,48,32,100);persistUi();applyUi();go('main');notify('설정을 저장했습니다.');return;
+      case 'resetui':{
+        if(!confirm('UI 설정을 초기화할까요?\n버튼 글자·크기, 창 위치·크기 및 테마가 기본값으로 돌아갑니다.\n저장된 폴더와 텍스트는 그대로 유지됩니다.'))return;
+        ui=defaultUi();persistUi();applyUi();render();notify('UI 설정을 초기화했습니다.');return;
+      }
+      case 'resetlibrary':{
+        if(!confirm('보관함 전체를 초기화할까요?\n모든 저장 텍스트와 사용자 폴더가 삭제되며 기본 폴더만 복원됩니다.\n복구하려면 미리 JSON 백업을 해야 합니다.'))return;
+        if(!confirm('마지막 확인입니다. 정말 모든 보관함 데이터와 폴더를 삭제할까요?\n이 작업은 되돌릴 수 없습니다.'))return;
+        data=defaultData();category='all';sub='all';query='';selected.clear();editorId=null;editingFolderId=null;
+        persist();go('main');notify('보관함을 기본 상태로 초기화했습니다.');return;
+      }
     }
   }
   root.addEventListener('click', event=>{
@@ -263,6 +323,7 @@
   root.addEventListener('input',event=>{
     const t=event.target;
     if(t.id==='search'){query=t.value;const items=data.entries.filter(entryVisible);$('#results').innerHTML=items.length?items.map(card).join(''):'<div class="empty">검색 결과가 없습니다.</div>';return;}
+    if(t.id==='theme-select'){ui.theme=t.value;applyTheme();persistUi();return;}
     if(t.id==='button-size'){$('#button-size-value').textContent=t.value+'px';ui.buttonSize=asNumber(t.value,48,32,100);applyUi();return;}
     if(t.id==='button-text'){ui.buttonText=sanitizeText(t.value,32);applyUi();}
   });
