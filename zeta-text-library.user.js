@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.9
+// @version      0.1.0
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.0.9';
+  const VERSION = '0.1.0';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -30,8 +30,8 @@
     {id:'profile',parentId:null,name:'유저 프로필'},
     {id:'ooc-summary',parentId:'ooc',name:'요약'},
     {id:'ooc-style',parentId:'ooc',name:'문체'}
-  ], entries: [] });
-  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto' });
+  ], entries: [], orders: {} });
+  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto',allSortMode:'user' });
   const safePos = p => p && Number.isFinite(p.x) && Number.isFinite(p.y) ? {x:p.x,y:p.y} : null;
   const asNumber = (n, fallback, min, max) => Number.isFinite(+n) ? Math.max(min, Math.min(max, +n)) : fallback;
   const sanitizeText = (v, max) => String(v ?? '').slice(0,max);
@@ -61,7 +61,17 @@
       const folderId = e.folderId == null ? null : sanitizeText(e.folderId,100);
       entries.push({id,folderId:ids.has(folderId)?folderId:null,title:sanitizeText(e.title,200),body:sanitizeText(e.body,200000),createdAt:sanitizeText(e.createdAt,50),updatedAt:sanitizeText(e.updatedAt,50)});
     }
-    return {schema:1,folders,entries};
+    const validEntryIds=new Set(entries.map(e=>e.id));
+    const orders={};
+    if(value.orders && typeof value.orders==='object' && !Array.isArray(value.orders)){
+      for(const [key,ids] of Object.entries(value.orders).slice(0,4005)){
+        if(typeof key!=='string'||key.length>140||!Array.isArray(ids))continue;
+        const unique=new Set();
+        orders[key]=ids.filter(id=>typeof id==='string'&&validEntryIds.has(id)&&!unique.has(id)&&unique.add(id)).slice(0,20000);
+      }
+    }
+    // Old backups without orders keep their existing entries array as the initial order.
+    return {schema:1,folders,entries,orders};
   }
   let data;
   try { data = normalizeData(read(DATA_KEY,defaultData())); } catch (_) { data=defaultData(); }
@@ -86,6 +96,7 @@
   const oldUi = read(UI_KEY, defaultUi());
   let ui = {...defaultUi(), ...(oldUi && typeof oldUi === 'object' ? oldUi : {})};
   ui.theme = ['light','dark','auto'].includes(ui.theme) ? ui.theme : 'auto';
+  ui.allSortMode = ui.allSortMode==='folder'?'folder':'user';
   ui.buttonText = sanitizeText(ui.buttonText,32);
   ui.buttonSize = asNumber(ui.buttonSize,48,32,100);
   ui.panelW = asNumber(ui.panelW,380,260,1600);
@@ -108,7 +119,7 @@
     #header strong{font-size:14px} #header .controls{display:flex;gap:5px} #content{padding:12px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0} #footer {display:flex;gap:7px;padding:10px 12px;border-top:1px solid #e5e5ed;flex-shrink:0;flex-wrap:wrap;background:#fff}
     .btn{border:1px solid #d7d8e0;color:#303240;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;min-height:31px} .btn.primary{background:#35384a;color:#fff;border-color:#35384a} .btn.sm{padding:4px 7px;min-height:27px} .btn.danger{color:#ad3044} .btn.active{background:#33374b;color:#fff;border-color:#33374b} .btn:hover{filter:brightness(.96)}
     .tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 9px;flex-wrap:nowrap} .tabs .btn{flex:0 0 auto;white-space:nowrap} .muted{color:#777a87;font-size:12px} .headrow{display:flex;justify-content:space-between;align-items:center;gap:7px;margin:8px 0} .subline{border-top:1px solid #e9e9ee;padding-top:10px}
-    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0} .actions .drag-handle{touch-action:none;cursor:grab;user-select:none;font-weight:800;padding:5px 10px} .actions .drag-handle:active{cursor:grabbing} .entry.drag-source{opacity:.5} .entry.drop-before{box-shadow:inset 0 3px 0 #8496d6} .entry.drop-after{box-shadow:inset 0 -3px 0 #8496d6} .entry.drag-group{outline:1px solid #8496d6} .actions .pick-label[hidden]{display:none!important}
+    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0} .actions .drag-handle{touch-action:none;cursor:grab;user-select:none;font-weight:800;padding:5px 10px} .actions .drag-handle:active{cursor:grabbing} .entry.drag-source{opacity:.5} .entry.drop-before{box-shadow:inset 0 3px 0 #8496d6} .entry.drop-after{box-shadow:inset 0 -3px 0 #8496d6} .entry.drag-group{outline:1px solid #8496d6} .sort-mode{display:flex;gap:5px;margin:10px 0 4px;flex-wrap:wrap} .group-heading{font-weight:700;font-size:12px;padding:9px 5px 4px;border-bottom:1px solid #ddd} .actions .pick-label[hidden]{display:none!important}
     input[type=text],input[type=search],textarea,select{width:100%;border:1px solid #cccfd8;border-radius:8px;padding:9px;background:#fff;color:#242633;min-width:0} textarea{resize:vertical;min-height:150px;line-height:1.5} #entry-body{resize:none;overflow-y:hidden;height:auto} label.field{display:block;margin:10px 0 5px;font-size:12px;font-weight:700} .row{display:flex;gap:7px;align-items:center} .row>*{min-width:0} .fill{flex:1} .box{background:#f7f7fa;border:1px solid #e7e7ee;padding:10px;border-radius:9px;margin:9px 0} .folder-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #ededf2} .folder-row .name{flex:1;overflow-wrap:anywhere} .folder-row.child{padding-left:15px} .empty{text-align:center;padding:25px 4px;color:#858894;font-size:12px}
     #grip{position:absolute;right:0;bottom:0;width:30px;height:30px;cursor:nwse-resize;touch-action:none;z-index:4;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px;color:#7c8194;font-size:19px;line-height:1;user-select:none} #toast{position:absolute;bottom:47px;left:12px;right:12px;text-align:center;background:#303449;color:white;border-radius:8px;padding:8px;font-size:12px;pointer-events:none;display:none;z-index:6}
     .check{width:17px;height:17px;accent-color:#383d55;flex:none} .tiny{font-size:11px} .spacer{flex:1} .inline{display:flex;align-items:center;gap:5px;flex-wrap:wrap} .settingshint{line-height:1.6} .no-select{user-select:none}
@@ -175,6 +186,40 @@
     if(rootOf(e.folderId)!==category)return false;
     return sub==='all' || e.folderId===sub;
   }
+  // Persist independent order per view. Editing 'all' does not rewrite folder scopes.
+  const scopeKey=()=>category==='all'?'all':category==='uncategorized'?'uncategorized':sub==='all'?'folder:'+category:'folder:'+sub;
+  function sortedScope(scope,items){
+    const ids=data.orders?.[scope]||[];
+    const position=new Map(ids.map((id,i)=>[id,i]));
+    return items.slice().sort((a,b)=>{
+      const ai=position.has(a.id)?position.get(a.id):Infinity;
+      const bi=position.has(b.id)?position.get(b.id):Infinity;
+      return ai-bi;
+    });
+  }
+  function groupedEntries(items){
+    const byFolder=new Map();
+    const rootNames=[...folders(null).map(f=>f.id),'uncategorized'];
+    for(const e of items){
+      const rootId=e.folderId&&folderById(e.folderId)?rootOf(e.folderId):'uncategorized';
+      if(!byFolder.has(rootId))byFolder.set(rootId,[]);
+      byFolder.get(rootId).push(e);
+    }
+    const result=[];
+    for(const rootId of [...rootNames,...Array.from(byFolder.keys()).filter(k=>!rootNames.includes(k))]){
+      const group=byFolder.get(rootId);
+      if(!group?.length)continue;
+      const sorted=sortedScope(rootId==='uncategorized'?'uncategorized':'folder:'+rootId,group);
+      for(const entry of sorted)result.push({entry,group:rootId});
+    }
+    return result;
+  }
+  function orderedVisible(){
+    const items=data.entries.filter(entryVisible);
+    return category==='all'&&ui.allSortMode==='folder'
+      ?groupedEntries(items).map(x=>x.entry)
+      :sortedScope(scopeKey(),items);
+  }
   function renderTabs(){
     const mainTabs=[{id:'all',name:'전체'},...folders(null),{id:'uncategorized',name:'미분류'}];
     return `<div class="tabs">${mainTabs.map(f=>`<button class="btn sm ${category===f.id?'active':''}" data-act="cat" data-id="${esc(f.id)}">${esc(f.name)}</button>`).join('')}<button class="btn sm" data-act="newfolder" data-parent="">＋ 폴더</button></div>`;
@@ -184,13 +229,21 @@
     const children=folders(category);
     return `<div class="subline"><div class="tabs"><button class="btn sm ${sub==='all'?'active':''}" data-act="sub" data-id="all">전체</button>${children.map(f=>`<button class="btn sm ${sub===f.id?'active':''}" data-act="sub" data-id="${esc(f.id)}">${esc(f.name)}</button>`).join('')}<button class="btn sm" data-act="newfolder" data-parent="${esc(category)}">＋ 하위 폴더</button></div></div>`;
   }
-  function card(e){
+  function card(e,disableDrag=false){
     const path=e.folderId ? [folderById(rootOf(e.folderId))?.name,folderById(e.folderId)?.parentId?folderById(e.folderId)?.name:null].filter(Boolean).join(' / ') : '미분류';
-    return `<article class="entry" data-entry-id="${esc(e.id)}"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><button class="btn sm copy-main" data-act="copy" data-id="${esc(e.id)}">복사</button><span class="action-spacer" aria-hidden="true"></span><label class="row tiny pick-label" title="여러 항목 선택" ${selectionMode?'':'hidden'}><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button><button class="btn sm drag-handle" type="button" data-drag-id="${esc(e.id)}" aria-label="순서 드래그 이동" title="끌어서 이동 · 선택한 항목은 함께 이동">⠿</button></div></article>`;
+    return `<article class="entry" data-entry-id="${esc(e.id)}"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><button class="btn sm copy-main" data-act="copy" data-id="${esc(e.id)}">복사</button><span class="action-spacer" aria-hidden="true"></span><label class="row tiny pick-label" title="여러 항목 선택" ${selectionMode?'':'hidden'}><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button>${disableDrag?'':`<button class="btn sm drag-handle" type="button" data-drag-id="${esc(e.id)}" aria-label="순서 드래그 이동" title="끌어서 이동 · 선택한 항목은 함께 이동">⠿</button>`}</div></article>`;
   }
   function renderMain(){
-    const visible=data.entries.filter(entryVisible);
-    content.innerHTML=`${renderTabs()}${renderSub()}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?visible.map(card).join(''):'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
+    const visible=orderedVisible();
+    const grouped=category==='all'&&ui.allSortMode==='folder';
+    const grouping=grouped?groupedEntries(visible):null;
+    const results=grouped?grouping.map(({entry,group},i)=>{
+      const prior=i?grouping[i-1].group:null;
+      const heading=group!==prior?`<div class="group-heading">${esc(group==='uncategorized'?'미분류':folderById(group)?.name||'미분류')}</div>`:'';
+      return heading+card(entry,true);
+    }).join(''):visible.map(e=>card(e,false)).join('');
+    const sortTabs=category==='all'?`<div class="sort-mode" aria-label="전체 정렬 방식"><button class="btn sm ${ui.allSortMode==='folder'?'active':''}" data-act="allsort" data-mode="folder">폴더별 정렬</button><button class="btn sm ${ui.allSortMode==='user'?'active':''}" data-act="allsort" data-mode="user">사용자 정렬</button></div>`:'';
+    content.innerHTML=`${renderTabs()}${renderSub()}${sortTabs}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
   function optionsHtml(selectedId){
@@ -244,14 +297,22 @@
     let parsed,incoming;
     try {parsed=JSON.parse(await file.text());if(parsed?.format!=='zeta-text-vault')throw Error('제타 텍스트 보관함 백업이 아닙니다.');incoming=normalizeData(parsed.data);}catch(e){notify('가져오기 실패: '+(e.message||'형식 오류'));return;}
     if(!confirm(mode==='replace'?'기존 폴더와 텍스트를 모두 백업 내용으로 교체할까요?':'백업 항목을 기존 보관함에 합칠까요?'))return;
-    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'auto';persistUi();}}
+    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'auto';ui.allSortMode=ui.allSortMode==='folder'?'folder':'user';persistUi();}}
     else {
       const existingFolders=new Set(data.folders.map(f=>f.id));
       const remap=new Map();
       for(const f of incoming.folders){const id=existingFolders.has(f.id)?uid():f.id;remap.set(f.id,id);existingFolders.add(id);}
       for(const f of incoming.folders) data.folders.push({...f,id:remap.get(f.id),parentId:f.parentId?(remap.get(f.parentId)||null):null});
       const existingEntries=new Set(data.entries.map(e=>e.id));
-      for(const e of incoming.entries){const id=existingEntries.has(e.id)?uid():e.id;existingEntries.add(id);data.entries.push({...e,id,folderId:e.folderId?(remap.get(e.folderId)||null):null});}
+      const entryRemap=new Map();
+      for(const e of incoming.entries){const id=existingEntries.has(e.id)?uid():e.id;entryRemap.set(e.id,id);existingEntries.add(id);data.entries.push({...e,id,folderId:e.folderId?(remap.get(e.folderId)||null):null});}
+      for(const [key,ids] of Object.entries(incoming.orders||{})){
+        const destination=key.startsWith('folder:')?'folder:'+(remap.get(key.slice(7))||key.slice(7)):key;
+        const list=data.orders[destination]||[];
+        const known=new Set(list);
+        for(const id of ids){const mapped=entryRemap.get(id);if(mapped&&!known.has(mapped)){list.push(mapped);known.add(mapped);}}
+        data.orders[destination]=list;
+      }
     }
     persist();selected.clear();category='all';sub='all';query='';applyUi();go('main');notify('백업을 가져왔습니다.');
   }
@@ -283,6 +344,12 @@
       case 'folders':go('folders');return;
       case 'backup':go('backup');return;
       case 'cat':category=id;sub='all';selected.clear();render();return;
+      case 'allsort':{
+        if(category!=='all')return;
+        const mode=el.dataset.mode;
+        if(mode!=='user'&&mode!=='folder')return;
+        ui.allSortMode=mode;persistUi();render();return;
+      }
       case 'sub':sub=id;selected.clear();render();return;
       case 'newfolder':go('folders');if(el.dataset.parent!==undefined){const s=$('#folder-parent');if(s)s.value=el.dataset.parent||'';}return;
       case 'addfolder':{const parent=$('#folder-parent')?.value||null,name=$('#folder-name')?.value.trim();if(!name){notify('폴더 이름을 입력하세요.');return;}if(data.folders.some(f=>f.parentId===parent&&f.name===name)){notify('같은 이름의 폴더가 이미 있습니다.');return;}data.folders.push({id:uid(),parentId:parent,name});persist();render();notify('폴더를 추가했습니다.');return;}
@@ -306,7 +373,7 @@
       }
       case 'delete':{if(currentPage!=='editor'||editorId!==id)return;const e=data.entries.find(x=>x.id===id);if(!e||!confirm('"'+e.title+'" 항목을 삭제할까요?'))return;data.entries=data.entries.filter(x=>x.id!==id);selected.delete(id);editorId=null;persist();go('main');return;}
       case 'copy':{const e=data.entries.find(x=>x.id===id);if(e)void copyText(e.body);return;}
-      case 'copyselected':{const values=data.entries.filter(e=>selected.has(e.id)).map(e=>e.body);if(values.length){void copyText(values.join('\n\n'));selectionMode=false;selected.clear();render();}return;}
+      case 'copyselected':{const values=orderedVisible().filter(e=>selected.has(e.id)).map(e=>e.body);if(values.length){void copyText(values.join('\n\n'));selectionMode=false;selected.clear();render();}return;}
       case 'export':downloadJson();return;
       case 'import':void importJson();return;
       case 'savesettings':ui.theme=['light','dark','auto'].includes($('#theme-select')?.value)?$('#theme-select').value:'auto';ui.buttonText=sanitizeText($('#button-text')?.value||'📚',32);ui.buttonSize=asNumber($('#button-size')?.value,48,32,100);persistUi();applyUi();go('main');notify('설정을 저장했습니다.');return;
@@ -341,25 +408,32 @@
   // Pointer Events work on touch Safari as well as mouse/trackpad.
   // Only the handle begins a reorder, leaving card buttons and page scrolling usable.
   function reorderVisible(movingIds,targetId,after){
-    const visible=data.entries.filter(entryVisible);
+    if(category==='all'&&ui.allSortMode==='folder'){
+      alert('폴더별 정렬에서는 순서를 변경할 수 없습니다. 사용자 정렬로 전환해 주세요.');
+      return;
+    }
+    const visible=orderedVisible();
     const moving=new Set(movingIds);
-    if(!visible.some(e=>e.id===targetId) || moving.has(targetId))return;
+    if(!visible.some(e=>e.id===targetId)||moving.has(targetId))return;
     const ordered=visible.filter(e=>!moving.has(e.id));
     const pos=ordered.findIndex(e=>e.id===targetId);
     if(pos<0)return;
-    const block=visible.filter(e=>moving.has(e.id));
-    ordered.splice(pos+(after?1:0),0,...block);
-    const slots=[];
-    for(let i=0;i<data.entries.length;i++)if(entryVisible(data.entries[i]))slots.push(i);
-    slots.forEach((slot,i)=>{data.entries[slot]=ordered[i];});
+    ordered.splice(pos+(after?1:0),0,...visible.filter(e=>moving.has(e.id)));
+    const key=scopeKey();
+    const current=sortedScope(key,data.entries);
+    const visibleIds=new Set(visible.map(e=>e.id));
+    let index=0;
+    const next=current.map(e=>visibleIds.has(e.id)?ordered[index++].id:e.id);
+    data.orders[key]=next;
+    // Other views keep their saved order. No folder order is changed from 전체.
     persist();render();
   }
   root.addEventListener('pointerdown',event=>{
     const handle=event.target.closest('[data-drag-id]');
-    if(!handle || currentPage!=='main' || event.button!==0)return;
+    if(!handle || currentPage!=='main' || event.button!==0 || (category==='all'&&ui.allSortMode==='folder'))return;
     const id=handle.dataset.dragId;
     const moving=selectionMode&&selected.has(id)&&selected.size>1
-      ? data.entries.filter(e=>selected.has(e.id)&&entryVisible(e)).map(e=>e.id)
+      ? orderedVisible().filter(e=>selected.has(e.id)).map(e=>e.id)
       : [id];
     const startX=event.clientX,startY=event.clientY,pid=event.pointerId;
     let started=false,hoverId=null,after=false;
