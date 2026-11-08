@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.4
+// @version      0.1.5
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.4';
+  const VERSION = '0.1.5';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -31,7 +31,7 @@
     {id:'ooc-summary',parentId:'ooc',name:'요약'},
     {id:'ooc-style',parentId:'ooc',name:'문체'}
   ], entries: [], orders: {} });
-  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto',allSortMode:'user',sortModes:{},sortBases:{} });
+  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto',allSortMode:'folder',sortModes:{},sortBases:{} });
   const safePos = p => p && Number.isFinite(p.x) && Number.isFinite(p.y) ? {x:p.x,y:p.y} : null;
   const asNumber = (n, fallback, min, max) => Number.isFinite(+n) ? Math.max(min, Math.min(max, +n)) : fallback;
   const sanitizeText = (v, max) => String(v ?? '').slice(0,max);
@@ -100,7 +100,7 @@
   ui.sortModes = ui.sortModes && typeof ui.sortModes==='object' && !Array.isArray(ui.sortModes)?ui.sortModes:{};
   ui.sortBases = ui.sortBases && typeof ui.sortBases==='object' && !Array.isArray(ui.sortBases)?ui.sortBases:{};
   if(!['folderAsc','folderDesc','createdAsc','createdDesc','user'].includes(ui.sortModes.all))
-    ui.sortModes.all=ui.allSortMode==='folder'?'folderAsc':'user';
+    ui.sortModes.all='folderAsc';
   ui.buttonText = sanitizeText(ui.buttonText,32);
   ui.buttonSize = asNumber(ui.buttonSize,48,32,100);
   ui.panelW = asNumber(ui.panelW,380,260,1600);
@@ -360,7 +360,7 @@
     if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'auto';
       ui.sortModes=ui.sortModes&&typeof ui.sortModes==='object'&&!Array.isArray(ui.sortModes)?ui.sortModes:{};
       ui.sortBases=ui.sortBases&&typeof ui.sortBases==='object'&&!Array.isArray(ui.sortBases)?ui.sortBases:{};
-      if(!isValidSort(ui.sortModes.all))ui.sortModes.all=ui.allSortMode==='folder'?'folderAsc':'user';
+      if(!isValidSort(ui.sortModes.all))ui.sortModes.all='folderAsc';
       persistUi();}}
     else {
       const existingFolders=new Set(data.folders.map(f=>f.id));
