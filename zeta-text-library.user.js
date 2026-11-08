@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.0
+// @version      0.1.1
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -31,7 +31,7 @@
     {id:'ooc-summary',parentId:'ooc',name:'요약'},
     {id:'ooc-style',parentId:'ooc',name:'문체'}
   ], entries: [], orders: {} });
-  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto',allSortMode:'user' });
+  const defaultUi = () => ({ buttonText:'📚',buttonSize:48,buttonPos:null,panelPos:null,panelW:380,panelH:540,theme:'auto',allSortMode:'user',sortModes:{},sortBases:{} });
   const safePos = p => p && Number.isFinite(p.x) && Number.isFinite(p.y) ? {x:p.x,y:p.y} : null;
   const asNumber = (n, fallback, min, max) => Number.isFinite(+n) ? Math.max(min, Math.min(max, +n)) : fallback;
   const sanitizeText = (v, max) => String(v ?? '').slice(0,max);
@@ -97,13 +97,17 @@
   let ui = {...defaultUi(), ...(oldUi && typeof oldUi === 'object' ? oldUi : {})};
   ui.theme = ['light','dark','auto'].includes(ui.theme) ? ui.theme : 'auto';
   ui.allSortMode = ui.allSortMode==='folder'?'folder':'user';
+  ui.sortModes = ui.sortModes && typeof ui.sortModes==='object' && !Array.isArray(ui.sortModes)?ui.sortModes:{};
+  ui.sortBases = ui.sortBases && typeof ui.sortBases==='object' && !Array.isArray(ui.sortBases)?ui.sortBases:{};
+  if(!['folderAsc','folderDesc','createdAsc','createdDesc','user'].includes(ui.sortModes.all))
+    ui.sortModes.all=ui.allSortMode==='folder'?'folderAsc':'user';
   ui.buttonText = sanitizeText(ui.buttonText,32);
   ui.buttonSize = asNumber(ui.buttonSize,48,32,100);
   ui.panelW = asNumber(ui.panelW,380,260,1600);
   ui.panelH = asNumber(ui.panelH,540,240,1600);
   ui.buttonPos = safePos(ui.buttonPos);
   ui.panelPos = safePos(ui.panelPos);
-  let category='all', sub='all', query='', selected=new Set(), selectionMode=false, showPanel=false, currentPage='main', editorId=null, editingFolderId=null, toastTimer=0;
+  let category='all', sub='all', query='', selected=new Set(), selectionMode=false, showPanel=false, currentPage='main', editorId=null, editingFolderId=null, sortSettingsScope=null, toastTimer=0;
 
   const host = document.createElement('div');
   host.id='ztv-host';
@@ -119,7 +123,7 @@
     #header strong{font-size:14px} #header .controls{display:flex;gap:5px} #content{padding:12px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0} #footer {display:flex;gap:7px;padding:10px 12px;border-top:1px solid #e5e5ed;flex-shrink:0;flex-wrap:wrap;background:#fff}
     .btn{border:1px solid #d7d8e0;color:#303240;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;min-height:31px} .btn.primary{background:#35384a;color:#fff;border-color:#35384a} .btn.sm{padding:4px 7px;min-height:27px} .btn.danger{color:#ad3044} .btn.active{background:#33374b;color:#fff;border-color:#33374b} .btn:hover{filter:brightness(.96)}
     .tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 9px;flex-wrap:nowrap} .tabs .btn{flex:0 0 auto;white-space:nowrap} .muted{color:#777a87;font-size:12px} .headrow{display:flex;justify-content:space-between;align-items:center;gap:7px;margin:8px 0} .subline{border-top:1px solid #e9e9ee;padding-top:10px}
-    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0} .actions .drag-handle{touch-action:none;cursor:grab;user-select:none;font-weight:800;padding:5px 10px} .actions .drag-handle:active{cursor:grabbing} .entry.drag-source{opacity:.5} .entry.drop-before{box-shadow:inset 0 3px 0 #8496d6} .entry.drop-after{box-shadow:inset 0 -3px 0 #8496d6} .entry.drag-group{outline:1px solid #8496d6} .sort-mode{display:flex;gap:5px;margin:10px 0 4px;flex-wrap:wrap} .group-heading{font-weight:700;font-size:12px;padding:9px 5px 4px;border-bottom:1px solid #ddd} .actions .pick-label[hidden]{display:none!important}
+    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0} .actions .drag-handle{touch-action:none;cursor:grab;user-select:none;font-weight:800;padding:5px 10px} .actions .drag-handle:active{cursor:grabbing} .entry.drag-source{opacity:.5} .entry.drop-before{box-shadow:inset 0 3px 0 #8496d6} .entry.drop-after{box-shadow:inset 0 -3px 0 #8496d6} .entry.drag-group{outline:1px solid #8496d6} .sort-mode{display:flex;gap:5px;margin:10px 0 4px;flex-wrap:wrap} .group-heading{font-weight:700;font-size:12px;padding:9px 5px 4px;border-bottom:1px solid #ddd} .sort-mode{align-items:center} .sort-mode select{flex:1;min-width:145px;width:auto} .sort-label{font-weight:700;font-size:12px} .actions .pick-label[hidden]{display:none!important}
     input[type=text],input[type=search],textarea,select{width:100%;border:1px solid #cccfd8;border-radius:8px;padding:9px;background:#fff;color:#242633;min-width:0} textarea{resize:vertical;min-height:150px;line-height:1.5} #entry-body{resize:none;overflow-y:hidden;height:auto} label.field{display:block;margin:10px 0 5px;font-size:12px;font-weight:700} .row{display:flex;gap:7px;align-items:center} .row>*{min-width:0} .fill{flex:1} .box{background:#f7f7fa;border:1px solid #e7e7ee;padding:10px;border-radius:9px;margin:9px 0} .folder-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #ededf2} .folder-row .name{flex:1;overflow-wrap:anywhere} .folder-row.child{padding-left:15px} .empty{text-align:center;padding:25px 4px;color:#858894;font-size:12px}
     #grip{position:absolute;right:0;bottom:0;width:30px;height:30px;cursor:nwse-resize;touch-action:none;z-index:4;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px;color:#7c8194;font-size:19px;line-height:1;user-select:none} #toast{position:absolute;bottom:47px;left:12px;right:12px;text-align:center;background:#303449;color:white;border-radius:8px;padding:8px;font-size:12px;pointer-events:none;display:none;z-index:6}
     .check{width:17px;height:17px;accent-color:#383d55;flex:none} .tiny{font-size:11px} .spacer{flex:1} .inline{display:flex;align-items:center;gap:5px;flex-wrap:wrap} .settingshint{line-height:1.6} .no-select{user-select:none}
@@ -186,8 +190,13 @@
     if(rootOf(e.folderId)!==category)return false;
     return sub==='all' || e.folderId===sub;
   }
-  // Persist independent order per view. Editing 'all' does not rewrite folder scopes.
+  // Every scope has its own custom ordering; sorting by folder or registration
+  // never changes another scope's order.
   const scopeKey=()=>category==='all'?'all':category==='uncategorized'?'uncategorized':sub==='all'?'folder:'+category:'folder:'+sub;
+  const canChooseSort=()=>category==='all'||(category!=='uncategorized'&&sub==='all');
+  const isValidSort=x=>['folderAsc','folderDesc','createdAsc','createdDesc','user'].includes(x);
+  function sortModeFor(scope){return isValidSort(ui.sortModes?.[scope])?ui.sortModes[scope]:'user';}
+  const sortLabels={folderAsc:'폴더순 ↑',folderDesc:'폴더순 ↓',createdAsc:'등록순 ↑',createdDesc:'등록순 ↓',user:'사용자 정렬'};
   function sortedScope(scope,items){
     const ids=data.orders?.[scope]||[];
     const position=new Map(ids.map((id,i)=>[id,i]));
@@ -197,28 +206,59 @@
       return ai-bi;
     });
   }
-  function groupedEntries(items){
-    const byFolder=new Map();
-    const rootNames=[...folders(null).map(f=>f.id),'uncategorized'];
-    for(const e of items){
-      const rootId=e.folderId&&folderById(e.folderId)?rootOf(e.folderId):'uncategorized';
-      if(!byFolder.has(rootId))byFolder.set(rootId,[]);
-      byFolder.get(rootId).push(e);
-    }
+  function entryDateOrder(items,desc=false){
+    const indexed=new Map(data.entries.map((e,i)=>[e.id,i]));
+    return items.slice().sort((a,b)=>{
+      const ta=Date.parse(a.createdAt),tb=Date.parse(b.createdAt);
+      const da=Number.isFinite(ta)?ta:indexed.get(a.id);
+      const db=Number.isFinite(tb)?tb:indexed.get(b.id);
+      const diff=da-db;
+      return (desc?-diff:diff) || ((indexed.get(a.id)-indexed.get(b.id))*(desc?-1:1));
+    });
+  }
+  function folderSorted(items,desc=false,scope=scopeKey()){
+    const index=new Map();
+    const folderOrder=category==='all'
+      ?[...folders(null).flatMap(parent=>[parent.id,...folders(parent.id).map(f=>f.id)]),'uncategorized']
+      :[category,...folders(category).map(f=>f.id)];
+    folderOrder.forEach((id,i)=>index.set(id,i));
+    const groupOf=e=>{
+      if(!e.folderId || !folderById(e.folderId))return 'uncategorized';
+      return e.folderId;
+    };
+    const sorted=items.slice().sort((a,b)=>{
+      const ga=index.get(groupOf(a))??Number.MAX_SAFE_INTEGER;
+      const gb=index.get(groupOf(b))??Number.MAX_SAFE_INTEGER;
+      return ga-gb;
+    });
+    // Respect each folder's own custom ordering inside its group, when present.
     const result=[];
-    for(const rootId of [...rootNames,...Array.from(byFolder.keys()).filter(k=>!rootNames.includes(k))]){
-      const group=byFolder.get(rootId);
-      if(!group?.length)continue;
-      const sorted=sortedScope(rootId==='uncategorized'?'uncategorized':'folder:'+rootId,group);
-      for(const entry of sorted)result.push({entry,group:rootId});
+    for(let i=0;i<sorted.length;){
+      const key=groupOf(sorted[i]);let j=i+1;
+      while(j<sorted.length && groupOf(sorted[j])===key)j++;
+      result.push(...sortedScope(key==='uncategorized'?'uncategorized':'folder:'+key,sorted.slice(i,j)));
+      i=j;
     }
-    return result;
+    return desc?result.reverse():result;
+  }
+  function baseOrdered(scope,items,mode){
+    if(mode==='folderAsc'||mode==='folderDesc')return folderSorted(items,mode==='folderDesc',scope);
+    if(mode==='createdAsc'||mode==='createdDesc')return entryDateOrder(items,mode==='createdDesc');
+    return sortedScope(scope,items);
+  }
+  function scopeEntriesUnfiltered(){
+    const original=query;query='';
+    try{return data.entries.filter(entryVisible);}finally{query=original;}
   }
   function orderedVisible(){
-    const items=data.entries.filter(entryVisible);
-    return category==='all'&&ui.allSortMode==='folder'
-      ?groupedEntries(items).map(x=>x.entry)
-      :sortedScope(scopeKey(),items);
+    const scope=scopeKey(),items=data.entries.filter(entryVisible);
+    return baseOrdered(scope,items,sortModeFor(scope));
+  }
+  function hasCustomOrder(scope){return Array.isArray(data.orders?.[scope]) && data.orders[scope].length>0;}
+  function seedUserOrder(scope,basis){
+    const ids=baseOrdered(scope,scopeEntriesUnfiltered(),basis).map(e=>e.id);
+    data.orders[scope]=ids;data.orders[scope+'-basis']=undefined;
+    persist();
   }
   function renderTabs(){
     const mainTabs=[{id:'all',name:'전체'},...folders(null),{id:'uncategorized',name:'미분류'}];
@@ -235,16 +275,30 @@
   }
   function renderMain(){
     const visible=orderedVisible();
-    const grouped=category==='all'&&ui.allSortMode==='folder';
-    const grouping=grouped?groupedEntries(visible):null;
-    const results=grouped?grouping.map(({entry,group},i)=>{
-      const prior=i?grouping[i-1].group:null;
-      const heading=group!==prior?`<div class="group-heading">${esc(group==='uncategorized'?'미분류':folderById(group)?.name||'미분류')}</div>`:'';
-      return heading+card(entry,true);
-    }).join(''):visible.map(e=>card(e,false)).join('');
-    const sortTabs=category==='all'?`<div class="sort-mode" aria-label="전체 정렬 방식"><button class="btn sm ${ui.allSortMode==='folder'?'active':''}" data-act="allsort" data-mode="folder">폴더별 정렬</button><button class="btn sm ${ui.allSortMode==='user'?'active':''}" data-act="allsort" data-mode="user">사용자 정렬</button></div>`:'';
-    content.innerHTML=`${renderTabs()}${renderSub()}${sortTabs}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
+    const scope=scopeKey();
+    const mode=sortModeFor(scope);
+    const isGrouped=canChooseSort()&&(mode==='folderAsc'||mode==='folderDesc');
+    let lastGroup=null;
+    const results=visible.map(e=>{
+      let heading='';
+      if(isGrouped){
+        const folder=e.folderId&&folderById(e.folderId);
+        const key=folder?.id||'uncategorized';
+        if(key!==lastGroup){lastGroup=key;heading=`<div class="group-heading">${esc(folder?.name||'미분류')}</div>`;}
+      }
+      return heading+card(e,mode!=='user');
+    }).join('');
+    const available=canChooseSort();
+    const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순 ↑</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순 ↓</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순 ↑ (오래된 순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순 ↓ (최신 순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select><button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button></div>`:'';
+    content.innerHTML=`${renderTabs()}${renderSub()}${sortMenu}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
+  }
+  function renderSortSettings(){
+    const scope=sortSettingsScope||scopeKey();
+    const basis=['folderAsc','folderDesc','createdAsc','createdDesc'].includes(ui.sortBases?.[scope])?ui.sortBases[scope]:'createdAsc';
+    const name=scope==='all'?'전체':scope.startsWith('folder:')?(folderById(scope.slice(7))?.name||'폴더')+' → 전체':'미분류';
+    content.innerHTML=`<h3>사용자 정렬 설정</h3><div class="muted">적용 위치: ${esc(name)}</div><div class="box settingshint"><strong>기본 순서 (사용자 정렬 초기화 기준)</strong><div class="muted">사용자 정렬을 처음 만들거나 초기화할 때 사용할 순서를 선택하세요.</div><label class="field" for="sort-base">기준 선택</label><select id="sort-base"><option value="folderAsc" ${basis==='folderAsc'?'selected':''}>폴더순 ↑</option><option value="folderDesc" ${basis==='folderDesc'?'selected':''}>폴더순 ↓</option><option value="createdAsc" ${basis==='createdAsc'?'selected':''}>등록순 ↑ (오래된 순)</option><option value="createdDesc" ${basis==='createdDesc'?'selected':''}>등록순 ↓ (최신 순)</option></select></div><div class="box settingshint"><strong>사용자 정렬 초기화</strong><div class="muted">선택한 기준으로 이 위치의 사용자 정렬을 다시 만듭니다. 이미 드래그한 순서는 확인 후 덮어쓰며, 다른 폴더 순서와 텍스트는 변경하지 않습니다.</div><button class="btn primary" data-act="resetsort">기준 순서로 초기화</button></div>`;
+    footer.innerHTML=`<button class="btn" data-act="main">← 목록으로</button>`;
   }
   function optionsHtml(selectedId){
     return `<option value="" ${!selectedId?'selected':''}>미분류</option>`+folders(null).map(f=>`<option value="${esc(f.id)}" ${selectedId===f.id?'selected':''}>${esc(f.name)}</option>`+folders(f.id).map(c=>`<option value="${esc(c.id)}" ${selectedId===c.id?'selected':''}>　↳ ${esc(c.name)}</option>`).join('')).join('');
@@ -281,7 +335,7 @@
     content.innerHTML=`<h3>백업 및 복원</h3><div class="box settingshint">폴더, 텍스트 및 창·버튼 설정을 하나의 JSON 파일로 백업합니다. 파일은 직접 보관해야 합니다.</div><button class="btn primary" data-act="export">JSON 전체 백업 다운로드</button><hr style="border:0;border-top:1px solid #e5e5ed;margin:16px 0"><h3>JSON 가져오기</h3><label class="field">백업 파일 선택</label><input id="import-file" type="file" accept=".json,application/json"><label class="field">복원 방식</label><label class="row" style="margin:10px 0"><input type="radio" name="import-mode" value="merge" checked> 기존 데이터에 합치기</label><label class="row" style="margin:10px 0"><input type="radio" name="import-mode" value="replace"> 기존 데이터를 모두 바꾸기</label><div class="muted">합치기는 동일한 ID의 항목을 중복 추가하지 않습니다. 바꾸기는 기존 보관 내용을 교체하므로 주의하세요.</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="import">가져오기</button><button class="btn" data-act="main">돌아가기</button>`;
   }
-  function render(){ if(!showPanel)return; switch(currentPage){case 'editor':renderEditor();break;case 'folders':renderFolders();break;case 'folderedit':renderFolderEdit();break;case 'settings':renderSettings();break;case 'backup':renderBackup();break;default:renderMain();} }
+  function render(){ if(!showPanel)return; switch(currentPage){case 'editor':renderEditor();break;case 'folders':renderFolders();break;case 'folderedit':renderFolderEdit();break;case 'settings':renderSettings();break;case 'backup':renderBackup();break;case 'sortsettings':renderSortSettings();break;default:renderMain();} }
   function go(page){currentPage=page;render();content.scrollTop=0;}
   function downloadJson(){
     const backup={format:'zeta-text-vault',version:VERSION,exportedAt:new Date().toISOString(),data,ui};
@@ -297,7 +351,11 @@
     let parsed,incoming;
     try {parsed=JSON.parse(await file.text());if(parsed?.format!=='zeta-text-vault')throw Error('제타 텍스트 보관함 백업이 아닙니다.');incoming=normalizeData(parsed.data);}catch(e){notify('가져오기 실패: '+(e.message||'형식 오류'));return;}
     if(!confirm(mode==='replace'?'기존 폴더와 텍스트를 모두 백업 내용으로 교체할까요?':'백업 항목을 기존 보관함에 합칠까요?'))return;
-    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'auto';ui.allSortMode=ui.allSortMode==='folder'?'folder':'user';persistUi();}}
+    if(mode==='replace') {data=incoming;if(parsed.ui&&typeof parsed.ui==='object'){ui={...defaultUi(),...parsed.ui};ui.buttonPos=safePos(ui.buttonPos);ui.panelPos=safePos(ui.panelPos);ui.buttonText=sanitizeText(ui.buttonText,32);ui.buttonSize=asNumber(ui.buttonSize,48,32,100);ui.panelW=asNumber(ui.panelW,380,260,1600);ui.panelH=asNumber(ui.panelH,540,240,1600);ui.theme=['light','dark','auto'].includes(ui.theme)?ui.theme:'auto';
+      ui.sortModes=ui.sortModes&&typeof ui.sortModes==='object'&&!Array.isArray(ui.sortModes)?ui.sortModes:{};
+      ui.sortBases=ui.sortBases&&typeof ui.sortBases==='object'&&!Array.isArray(ui.sortBases)?ui.sortBases:{};
+      if(!isValidSort(ui.sortModes.all))ui.sortModes.all=ui.allSortMode==='folder'?'folderAsc':'user';
+      persistUi();}}
     else {
       const existingFolders=new Set(data.folders.map(f=>f.id));
       const remap=new Map();
@@ -344,11 +402,15 @@
       case 'folders':go('folders');return;
       case 'backup':go('backup');return;
       case 'cat':category=id;sub='all';selected.clear();render();return;
-      case 'allsort':{
-        if(category!=='all')return;
-        const mode=el.dataset.mode;
-        if(mode!=='user'&&mode!=='folder')return;
-        ui.allSortMode=mode;persistUi();render();return;
+      case 'sortsettings':sortSettingsScope=scopeKey();go('sortsettings');return;
+      case 'resetsort':{
+        const scope=sortSettingsScope||scopeKey(),basis=$('#sort-base')?.value||'createdAsc';
+        if(!['folderAsc','folderDesc','createdAsc','createdDesc'].includes(basis))return;
+        if(hasCustomOrder(scope) && !confirm('현재 사용자 정렬 순서를 선택한 기준으로 초기화할까요?\\n기존에 드래그로 지정한 순서가 덮어써집니다.'))return;
+        ui.sortBases[scope]=basis;
+        ui.sortModes[scope]='user';
+        seedUserOrder(scope,basis);
+        persistUi();go('main');notify('선택한 기준으로 사용자 정렬을 설정했습니다.');return;
       }
       case 'sub':sub=id;selected.clear();render();return;
       case 'newfolder':go('folders');if(el.dataset.parent!==undefined){const s=$('#folder-parent');if(s)s.value=el.dataset.parent||'';}return;
@@ -395,6 +457,21 @@
   });
   root.addEventListener('change',event=>{
     const t=event.target;
+    if(t.id==='view-sort'){
+      const scope=scopeKey(),mode=t.value;
+      if(!isValidSort(mode))return;
+      ui.sortModes[scope]=mode;
+      persistUi();
+      if(mode==='user'&&!hasCustomOrder(scope)){sortSettingsScope=scope;go('sortsettings');return;}
+      render();return;
+    }
+    if(t.id==='sort-base'){
+      const scope=sortSettingsScope||scopeKey();
+      if(['folderAsc','folderDesc','createdAsc','createdDesc'].includes(t.value)){
+        ui.sortBases[scope]=t.value;persistUi();
+      }
+      return;
+    }
     if(t.matches('[data-pick]')){t.checked?selected.add(t.dataset.pick):selected.delete(t.dataset.pick);const button=footer.querySelector('[data-act="copyselected"]');if(button){button.disabled=!selected.size;button.textContent=`선택 복사 (${selected.size})`;}}
   });
   root.addEventListener('input',event=>{
@@ -408,10 +485,8 @@
   // Pointer Events work on touch Safari as well as mouse/trackpad.
   // Only the handle begins a reorder, leaving card buttons and page scrolling usable.
   function reorderVisible(movingIds,targetId,after){
-    if(category==='all'&&ui.allSortMode==='folder'){
-      alert('폴더별 정렬에서는 순서를 변경할 수 없습니다. 사용자 정렬로 전환해 주세요.');
-      return;
-    }
+    const scope=scopeKey();
+    if(sortModeFor(scope)!=='user')return;
     const visible=orderedVisible();
     const moving=new Set(movingIds);
     if(!visible.some(e=>e.id===targetId)||moving.has(targetId))return;
@@ -419,18 +494,15 @@
     const pos=ordered.findIndex(e=>e.id===targetId);
     if(pos<0)return;
     ordered.splice(pos+(after?1:0),0,...visible.filter(e=>moving.has(e.id)));
-    const key=scopeKey();
-    const current=sortedScope(key,data.entries);
+    const current=sortedScope(scope,data.entries);
     const visibleIds=new Set(visible.map(e=>e.id));
     let index=0;
-    const next=current.map(e=>visibleIds.has(e.id)?ordered[index++].id:e.id);
-    data.orders[key]=next;
-    // Other views keep their saved order. No folder order is changed from 전체.
+    data.orders[scope]=current.map(e=>visibleIds.has(e.id)?ordered[index++].id:e.id);
     persist();render();
   }
   root.addEventListener('pointerdown',event=>{
     const handle=event.target.closest('[data-drag-id]');
-    if(!handle || currentPage!=='main' || event.button!==0 || (category==='all'&&ui.allSortMode==='folder'))return;
+    if(!handle || currentPage!=='main' || event.button!==0 || sortModeFor(scopeKey())!=='user')return;
     const id=handle.dataset.dragId;
     const moving=selectionMode&&selected.has(id)&&selected.size>1
       ? orderedVisible().filter(e=>selected.has(e.id)).map(e=>e.id)
