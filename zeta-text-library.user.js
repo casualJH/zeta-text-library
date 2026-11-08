@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.6
+// @version      0.0.7
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -133,13 +133,13 @@
   </style>
   <button type="button" id="launcher" aria-label="제타 텍스트 보관함 열기"></button>
   <section id="panel" hidden aria-label="제타 텍스트 보관함">
-    <div id="header"><strong>제타 텍스트 보관함</strong><div class="controls"><button class="btn sm" data-act="settings" aria-label="설정">⚙</button><button class="btn sm" data-act="close" aria-label="닫기">✕</button></div></div>
+    <div id="header"><strong>제타 텍스트 보관함</strong><div class="controls"><button class="btn sm" type="button" data-act="toggletheme" id="theme-toggle" aria-label="테마 전환" title="라이트/다크 모드 전환">☾</button><button class="btn sm" data-act="settings" aria-label="설정">⚙</button><button class="btn sm" data-act="close" aria-label="닫기">✕</button></div></div>
     <main id="content"></main><footer id="footer"></footer><div id="toast"></div><div id="grip" title="끌어서 창 크기 조절">◢</div>
   </section>`;
   const $ = s => root.querySelector(s);
   const launcher=$('#launcher'), panel=$('#panel'), content=$('#content'), footer=$('#footer');
   const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)');
-  function applyTheme(){ const dark=ui.theme==='dark' || (ui.theme==='auto' && !!prefersDark?.matches);host.dataset.theme=dark?'dark':'light'; }
+  function applyTheme(){ const dark=ui.theme==='dark' || (ui.theme==='auto' && !!prefersDark?.matches);host.dataset.theme=dark?'dark':'light';const toggle=$('#theme-toggle');if(toggle){toggle.textContent=dark?'☀':'☾';toggle.setAttribute('aria-label',dark?'라이트 모드로 변경':'다크 모드로 변경');toggle.title=dark?'라이트 모드로 변경':'다크 모드로 변경';} }
   prefersDark?.addEventListener?.('change',()=>{if(ui.theme==='auto')applyTheme();});
   const persist = () => write(DATA_KEY,data);
   const persistUi = () => write(UI_KEY,ui);
@@ -278,6 +278,7 @@
     switch(act){
       case 'close':showPanel=false;panel.hidden=true;return;
       case 'main':go('main');return;
+      case 'toggletheme':ui.theme=host.dataset.theme==='dark'?'light':'dark';persistUi();applyTheme();if(currentPage==='settings')renderSettings();return;
       case 'settings':go('settings');return;
       case 'folders':go('folders');return;
       case 'backup':go('backup');return;
