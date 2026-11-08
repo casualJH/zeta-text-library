@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.8
+// @version      0.1.9
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.8';
+  const VERSION = '0.1.9';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -298,7 +298,7 @@
     const available=canChooseSort();
     const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순(최신순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select>${mode==='user'?`<button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button>`:''}</div>`:'';
     content.innerHTML=`${renderTabs()}${renderSub()}${sortMenu}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
-    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="moveselected" ${selected.size?'':'disabled'}>폴더 이동</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택</button>`}<button class="btn" data-act="backup">백업</button>`;
+    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="moveselected" ${selected.size?'':'disabled'}>폴더 이동</button><button class="btn danger" data-act="deleteselected" ${selected.size?'':'disabled'}>선택 삭제</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
   function renderSortSettings(){
     const scope=sortSettingsScope||scopeKey();
@@ -436,6 +436,17 @@
       case 'selectionon':selectionMode=true;selected.clear();render();return;
       case 'selectionoff':selectionMode=false;selected.clear();render();return;
       case 'moveselected':if(!selected.size)return;go('moveselected');return;
+      case 'deleteselected':{
+        if(!selectionMode||currentPage!=='main'||!selected.size)return;
+        const ids=new Set(data.entries.filter(e=>selected.has(e.id)).map(e=>e.id));
+        if(!ids.size)return;
+        if(!confirm(ids.size+'개 텍스트를 삭제할까요?\n삭제한 텍스트는 되돌릴 수 없습니다.'))return;
+        data.entries=data.entries.filter(e=>!ids.has(e.id));
+        for(const [key,order] of Object.entries(data.orders||{})){
+          if(Array.isArray(order))data.orders[key]=order.filter(id=>!ids.has(id));
+        }
+        persist();selectionMode=false;selected.clear();render();notify(ids.size+'개 텍스트를 삭제했습니다.');return;
+      }
       case 'confirmmoveselected':{
         if(currentPage!=='moveselected'||!selected.size)return;
         const folderId=$('#move-selected-folder')?.value||null;
@@ -495,7 +506,7 @@
       }
       return;
     }
-    if(t.matches('[data-pick]')){t.checked?selected.add(t.dataset.pick):selected.delete(t.dataset.pick);const button=footer.querySelector('[data-act="copyselected"]');if(button){button.disabled=!selected.size;button.textContent=`선택 복사 (${selected.size})`;}const moveButton=footer.querySelector('[data-act="moveselected"]');if(moveButton)moveButton.disabled=!selected.size;}
+    if(t.matches('[data-pick]')){t.checked?selected.add(t.dataset.pick):selected.delete(t.dataset.pick);const button=footer.querySelector('[data-act="copyselected"]');if(button){button.disabled=!selected.size;button.textContent=`선택 복사 (${selected.size})`;}const moveButton=footer.querySelector('[data-act="moveselected"]');if(moveButton)moveButton.disabled=!selected.size;const deleteButton=footer.querySelector('[data-act="deleteselected"]');if(deleteButton)deleteButton.disabled=!selected.size;}
   });
   root.addEventListener('input',event=>{
     const t=event.target;
