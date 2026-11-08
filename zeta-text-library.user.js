@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.0.8
+// @version      0.0.9
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.0.8';
+  const VERSION = '0.0.9';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -92,7 +92,7 @@
   ui.panelH = asNumber(ui.panelH,540,240,1600);
   ui.buttonPos = safePos(ui.buttonPos);
   ui.panelPos = safePos(ui.panelPos);
-  let category='all', sub='all', query='', selected=new Set(), showPanel=false, currentPage='main', editorId=null, editingFolderId=null, toastTimer=0;
+  let category='all', sub='all', query='', selected=new Set(), selectionMode=false, showPanel=false, currentPage='main', editorId=null, editingFolderId=null, toastTimer=0;
 
   const host = document.createElement('div');
   host.id='ztv-host';
@@ -108,7 +108,7 @@
     #header strong{font-size:14px} #header .controls{display:flex;gap:5px} #content{padding:12px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0} #footer {display:flex;gap:7px;padding:10px 12px;border-top:1px solid #e5e5ed;flex-shrink:0;flex-wrap:wrap;background:#fff}
     .btn{border:1px solid #d7d8e0;color:#303240;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;min-height:31px} .btn.primary{background:#35384a;color:#fff;border-color:#35384a} .btn.sm{padding:4px 7px;min-height:27px} .btn.danger{color:#ad3044} .btn.active{background:#33374b;color:#fff;border-color:#33374b} .btn:hover{filter:brightness(.96)}
     .tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 9px;flex-wrap:nowrap} .tabs .btn{flex:0 0 auto;white-space:nowrap} .muted{color:#777a87;font-size:12px} .headrow{display:flex;justify-content:space-between;align-items:center;gap:7px;margin:8px 0} .subline{border-top:1px solid #e9e9ee;padding-top:10px}
-    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0}
+    .entry{border:1px solid #e0e1e8;border-radius:10px;padding:10px;margin:9px 0;background:#fff} .entry-title{display:flex;align-items:center;gap:7px;justify-content:space-between;font-weight:700;overflow-wrap:anywhere} .preview{font-size:12px;color:#565a67;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:hidden;margin:8px 0} .actions{display:flex;gap:5px;justify-content:flex-start;align-items:center;flex-wrap:wrap} .actions .copy-main{background:#35384a;color:#fff;border-color:#35384a;font-weight:700;padding-left:12px;padding-right:12px} .actions .copy-main:hover{filter:brightness(1.12)} .actions .action-spacer{flex:1 1 6px;min-width:0} .actions .pick-label{margin-left:0} .actions .drag-handle{touch-action:none;cursor:grab;user-select:none;font-weight:800;padding:5px 10px} .actions .drag-handle:active{cursor:grabbing} .entry.drag-source{opacity:.5} .entry.drop-before{box-shadow:inset 0 3px 0 #8496d6} .entry.drop-after{box-shadow:inset 0 -3px 0 #8496d6} .entry.drag-group{outline:1px solid #8496d6} .actions .pick-label[hidden]{display:none!important}
     input[type=text],input[type=search],textarea,select{width:100%;border:1px solid #cccfd8;border-radius:8px;padding:9px;background:#fff;color:#242633;min-width:0} textarea{resize:vertical;min-height:150px;line-height:1.5} #entry-body{resize:none;overflow-y:hidden;height:auto} label.field{display:block;margin:10px 0 5px;font-size:12px;font-weight:700} .row{display:flex;gap:7px;align-items:center} .row>*{min-width:0} .fill{flex:1} .box{background:#f7f7fa;border:1px solid #e7e7ee;padding:10px;border-radius:9px;margin:9px 0} .folder-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #ededf2} .folder-row .name{flex:1;overflow-wrap:anywhere} .folder-row.child{padding-left:15px} .empty{text-align:center;padding:25px 4px;color:#858894;font-size:12px}
     #grip{position:absolute;right:0;bottom:0;width:30px;height:30px;cursor:nwse-resize;touch-action:none;z-index:4;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px;color:#7c8194;font-size:19px;line-height:1;user-select:none} #toast{position:absolute;bottom:47px;left:12px;right:12px;text-align:center;background:#303449;color:white;border-radius:8px;padding:8px;font-size:12px;pointer-events:none;display:none;z-index:6}
     .check{width:17px;height:17px;accent-color:#383d55;flex:none} .tiny{font-size:11px} .spacer{flex:1} .inline{display:flex;align-items:center;gap:5px;flex-wrap:wrap} .settingshint{line-height:1.6} .no-select{user-select:none}
@@ -186,12 +186,12 @@
   }
   function card(e){
     const path=e.folderId ? [folderById(rootOf(e.folderId))?.name,folderById(e.folderId)?.parentId?folderById(e.folderId)?.name:null].filter(Boolean).join(' / ') : '미분류';
-    return `<article class="entry"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><button class="btn sm copy-main" data-act="copy" data-id="${esc(e.id)}">복사</button><span class="action-spacer" aria-hidden="true"></span><label class="row tiny pick-label" title="여러 항목 선택"><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button><button class="btn sm" data-act="moveentry" data-id="${esc(e.id)}" data-step="-1" title="항목 위로">↑</button><button class="btn sm" data-act="moveentry" data-id="${esc(e.id)}" data-step="1" title="항목 아래로">↓</button></div></article>`;
+    return `<article class="entry" data-entry-id="${esc(e.id)}"><div class="entry-title"><span>${esc(e.title||'제목 없음')}</span><span class="muted">${esc(path)}</span></div><div class="preview">${esc(e.body)}</div><div class="actions"><button class="btn sm copy-main" data-act="copy" data-id="${esc(e.id)}">복사</button><span class="action-spacer" aria-hidden="true"></span><label class="row tiny pick-label" title="여러 항목 선택" ${selectionMode?'':'hidden'}><input class="check" type="checkbox" data-pick="${esc(e.id)}" ${selected.has(e.id)?'checked':''}>선택</label><button class="btn sm" data-act="edit" data-id="${esc(e.id)}">수정</button><button class="btn sm drag-handle" type="button" data-drag-id="${esc(e.id)}" aria-label="순서 드래그 이동" title="끌어서 이동 · 선택한 항목은 함께 이동">⠿</button></div></article>`;
   }
   function renderMain(){
     const visible=data.entries.filter(entryVisible);
     content.innerHTML=`${renderTabs()}${renderSub()}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?visible.map(card).join(''):'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
-    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button><button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="backup">백업</button>`;
+    footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
   function optionsHtml(selectedId){
     return `<option value="" ${!selectedId?'selected':''}>미분류</option>`+folders(null).map(f=>`<option value="${esc(f.id)}" ${selectedId===f.id?'selected':''}>${esc(f.name)}</option>`+folders(f.id).map(c=>`<option value="${esc(c.id)}" ${selectedId===c.id?'selected':''}>　↳ ${esc(c.name)}</option>`).join('')).join('');
@@ -291,6 +291,8 @@
       case 'deletefolder':removeFolder(id);return;
       case 'movefolder':moveFolder(id,+el.dataset.step);return;
       case 'moveentry':moveEntry(id,+el.dataset.step);return;
+      case 'selectionon':selectionMode=true;selected.clear();render();return;
+      case 'selectionoff':selectionMode=false;selected.clear();render();return;
       case 'newentry':editorId=null;go('editor');return;
       case 'edit':editorId=id;go('editor');return;
       case 'saveentry':{
@@ -304,7 +306,7 @@
       }
       case 'delete':{if(currentPage!=='editor'||editorId!==id)return;const e=data.entries.find(x=>x.id===id);if(!e||!confirm('"'+e.title+'" 항목을 삭제할까요?'))return;data.entries=data.entries.filter(x=>x.id!==id);selected.delete(id);editorId=null;persist();go('main');return;}
       case 'copy':{const e=data.entries.find(x=>x.id===id);if(e)void copyText(e.body);return;}
-      case 'copyselected':{const values=data.entries.filter(e=>selected.has(e.id)).map(e=>e.body);if(values.length)void copyText(values.join('\n\n'));return;}
+      case 'copyselected':{const values=data.entries.filter(e=>selected.has(e.id)).map(e=>e.body);if(values.length){void copyText(values.join('\n\n'));selectionMode=false;selected.clear();render();}return;}
       case 'export':downloadJson();return;
       case 'import':void importJson();return;
       case 'savesettings':ui.theme=['light','dark','auto'].includes($('#theme-select')?.value)?$('#theme-select').value:'auto';ui.buttonText=sanitizeText($('#button-text')?.value||'📚',32);ui.buttonSize=asNumber($('#button-size')?.value,48,32,100);persistUi();applyUi();go('main');notify('설정을 저장했습니다.');return;
@@ -335,6 +337,72 @@
     if(t.id==='theme-select'){ui.theme=t.value;applyTheme();persistUi();return;}
     if(t.id==='button-size'){$('#button-size-value').textContent=t.value+'px';ui.buttonSize=asNumber(t.value,48,32,100);applyUi();return;}
     if(t.id==='button-text'){ui.buttonText=sanitizeText(t.value,32);applyUi();}
+  });
+  // Pointer Events work on touch Safari as well as mouse/trackpad.
+  // Only the handle begins a reorder, leaving card buttons and page scrolling usable.
+  function reorderVisible(movingIds,targetId,after){
+    const visible=data.entries.filter(entryVisible);
+    const moving=new Set(movingIds);
+    if(!visible.some(e=>e.id===targetId) || moving.has(targetId))return;
+    const ordered=visible.filter(e=>!moving.has(e.id));
+    const pos=ordered.findIndex(e=>e.id===targetId);
+    if(pos<0)return;
+    const block=visible.filter(e=>moving.has(e.id));
+    ordered.splice(pos+(after?1:0),0,...block);
+    const slots=[];
+    for(let i=0;i<data.entries.length;i++)if(entryVisible(data.entries[i]))slots.push(i);
+    slots.forEach((slot,i)=>{data.entries[slot]=ordered[i];});
+    persist();render();
+  }
+  root.addEventListener('pointerdown',event=>{
+    const handle=event.target.closest('[data-drag-id]');
+    if(!handle || currentPage!=='main' || event.button!==0)return;
+    const id=handle.dataset.dragId;
+    const moving=selectionMode&&selected.has(id)&&selected.size>1
+      ? data.entries.filter(e=>selected.has(e.id)&&entryVisible(e)).map(e=>e.id)
+      : [id];
+    const startX=event.clientX,startY=event.clientY,pid=event.pointerId;
+    let started=false,hoverId=null,after=false;
+    const clearMarks=()=>{root.querySelectorAll('.drag-source,.drag-group,.drop-before,.drop-after').forEach(el=>el.classList.remove('drag-source','drag-group','drop-before','drop-after'));};
+    const move=e=>{
+      if(e.pointerId!==pid)return;
+      if(!started && Math.hypot(e.clientX-startX,e.clientY-startY)<7)return;
+      if(!started){started=true;handle.setPointerCapture?.(pid);}
+      e.preventDefault();
+      clearMarks();
+      for(const movingId of moving){const el=Array.from(root.querySelectorAll('[data-entry-id]')).find(node=>node.dataset.entryId===movingId);el?.classList.add(movingId===id?'drag-source':'drag-group');}
+      // Native shadowRoot.elementFromPoint keeps the drop target inside the panel.
+      const hit=root.elementFromPoint?.(e.clientX,e.clientY);
+      const card=hit?.closest?.('[data-entry-id]');
+      hoverId=null;
+      if(card && !moving.includes(card.dataset.entryId)){
+        hoverId=card.dataset.entryId;
+        const bounds=card.getBoundingClientRect();
+        after=e.clientY>bounds.top+bounds.height/2;
+        card.classList.add(after?'drop-after':'drop-before');
+      }
+      const region=content.getBoundingClientRect();
+      if(e.clientY<region.top+28)content.scrollTop-=12;
+      else if(e.clientY>region.bottom-28)content.scrollTop+=12;
+    };
+    const finish=e=>{
+      if(e.pointerId!==pid)return;
+      handle.removeEventListener('pointermove',move);
+      handle.removeEventListener('pointerup',finish);
+      handle.removeEventListener('pointercancel',cancel);
+      clearMarks();
+      if(started&&hoverId)reorderVisible(moving,hoverId,after);
+    };
+    const cancel=e=>{
+      if(e.pointerId!==pid)return;
+      handle.removeEventListener('pointermove',move);
+      handle.removeEventListener('pointerup',finish);
+      handle.removeEventListener('pointercancel',cancel);
+      clearMarks();
+    };
+    handle.addEventListener('pointermove',move);
+    handle.addEventListener('pointerup',finish);
+    handle.addEventListener('pointercancel',cancel);
   });
   const pointerDrag = (handle,target,type) => {
     let suppressClick=false;
