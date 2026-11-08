@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      0.1.2
+// @version      0.1.3
 // @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
 // @description  OOC·유저 프로필·세계관 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
@@ -18,7 +18,7 @@
   if (window.top !== window.self) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '0.1.2';
+  const VERSION = '0.1.3';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
@@ -289,7 +289,7 @@
       return heading+card(e,mode!=='user');
     }).join('');
     const available=canChooseSort();
-    const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순(최신순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select><button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button></div>`:'';
+    const sortMenu=available?`<div class="sort-mode"><label class="sort-label" for="view-sort">정렬</label><select id="view-sort" aria-label="정렬 방식"><option value="folderAsc" ${mode==='folderAsc'?'selected':''}>폴더순</option><option value="folderDesc" ${mode==='folderDesc'?'selected':''}>폴더순(역순)</option><option value="createdAsc" ${mode==='createdAsc'?'selected':''}>등록순(오래된순)</option><option value="createdDesc" ${mode==='createdDesc'?'selected':''}>등록순(최신순)</option><option value="user" ${mode==='user'?'selected':''}>사용자 정렬</option></select>${mode==='user'?`<button class="btn sm" data-act="sortsettings">사용자 정렬 설정</button>`:''}</div>`:'';
     content.innerHTML=`${renderTabs()}${renderSub()}${sortMenu}<div class="headrow"><span class="muted">${visible.length}개 항목</span><button class="btn sm" data-act="folders">폴더 관리</button></div><input type="search" id="search" placeholder="제목 또는 본문 검색" value="${esc(query)}" aria-label="텍스트 검색"><div id="results">${visible.length?results:'<div class="empty">저장된 텍스트가 없습니다.</div>'}</div>`;
     footer.innerHTML=`<button class="btn primary" data-act="newentry">＋ 새 텍스트</button>${selectionMode?`<button class="btn" data-act="copyselected" ${selected.size?'':'disabled'}>선택 복사 (${selected.size})</button><button class="btn" data-act="selectionoff">취소</button>`:`<button class="btn" data-act="selectionon">선택 복사</button>`}<button class="btn" data-act="backup">백업</button>`;
   }
@@ -406,7 +406,7 @@
       case 'resetsort':{
         const scope=sortSettingsScope||scopeKey(),basis=$('#sort-base')?.value||'createdAsc';
         if(!['folderAsc','folderDesc','createdAsc','createdDesc'].includes(basis))return;
-        if(hasCustomOrder(scope) && !confirm('현재 사용자 정렬 순서를 선택한 기준으로 초기화할까요?\\n기존에 드래그로 지정한 순서가 덮어써집니다.'))return;
+        if(hasCustomOrder(scope) && !confirm('현재 사용자 정렬 순서를 선택한 기준으로 초기화할까요?\n기존에 드래그로 지정한 순서가 덮어써집니다.'))return;
         ui.sortBases[scope]=basis;
         ui.sortModes[scope]='user';
         seedUserOrder(scope,basis);
