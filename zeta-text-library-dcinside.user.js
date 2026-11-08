@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         제타 텍스트 보관함
 // @namespace    zeta-text-library
-// @version      1.0.0
-// @updateURL    https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
-// @downloadURL  https://raw.githubusercontent.com/casualJH/zeta-text-library/main/zeta-text-library.user.js
+// @version      1.0.1
 // @description  OOC·유저 프로필 등 텍스트를 공통 탭/폴더에 보관하고 복사·백업하는 도구
 // @match        https://zeta-ai.io/*
 // @match        https://*.zeta-ai.io/*
+// @match        https://m.dcinside.com/mini/zetaw*
+// @match        https://gall.dcinside.com/mini/board/*
 // @run-at       document-idle
 // @noframes
 // @grant        GM_getValue
@@ -16,9 +16,12 @@
 (function () {
   'use strict';
   if (window.top !== window.self) return;
+  // Permit only the zetaw mini-gallery on DC Inside.
+  if (location.hostname === 'm.dcinside.com' && !(location.pathname === '/mini/zetaw' || location.pathname.startsWith('/mini/zetaw/'))) return;
+  if (location.hostname === 'gall.dcinside.com' && !(location.pathname.startsWith('/mini/board/') && new URLSearchParams(location.search).get('id') === 'zetaw')) return;
   if (document.getElementById('ztv-host')) return;
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   const DATA_KEY = 'zeta-text-vault-data-v1';
   const UI_KEY = 'zeta-text-vault-ui-v1';
   const uid = () => 'ztv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
